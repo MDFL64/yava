@@ -2,11 +2,11 @@
 if SERVER then return end
 include("yava_lib/jit_watch.lua")
 
-local int = bit.tobit
 local band = bit.band
 local bor = bit.bor
 local rshift = bit.rshift
 local floor = math.floor
+local min = math.min
 
 -- store 4 12 bit numbers
 local function get_packed_12(n,i)
@@ -31,7 +31,7 @@ local function make_packed_12(a,b,c,d)
          + d*4096^3
 end
 
-local function chunk_set_block(chunk_block_data,x,y,z,v,dbg)
+local function chunk_set_block(chunk_block_data,x,y,z,v)
 
     local pack_addr
 
@@ -42,7 +42,7 @@ local function chunk_set_block(chunk_block_data,x,y,z,v,dbg)
         local pack = chunk_block_data[major_index]
         local val = get_packed_12(pack, minor_index)
 
-        if bit.band(val,0x800)==0 then
+        if band(val,0x800)==0 then
             if val == v then
                 -- no change needed
                 return
@@ -68,7 +68,7 @@ local function chunk_set_block(chunk_block_data,x,y,z,v,dbg)
         local pack = chunk_block_data[major_index]
         local val = get_packed_12(pack, minor_index)
 
-        if bit.band(val,0x800)==0 then
+        if band(val,0x800)==0 then
             if val == v then
                 -- no change needed
                 return
@@ -129,13 +129,6 @@ end
 
 -- rewrite?
 local function chunk_get_row(chunk_block_data,row,y,z,dbg)
-    
-    --[[if dbg then
-        print("===>>>>>>>>>===")
-        for x=0,31 do
-            print(".",chunk_get_block(chunk_block_data,x,y,z))
-        end
-    end]]
 
     -- z
     local val = get_packed_12(chunk_block_data[rshift(z,2)+1], band(z,3))
@@ -163,10 +156,8 @@ local function chunk_get_row(chunk_block_data,row,y,z,dbg)
     
     -- x
     local i = 1
-    --if dbg then print(">>>>>>>>>",x_pack_addr) end
     for x_major_index=pack_addr,pack_addr+7 do
         local x_pack = chunk_block_data[x_major_index]
-        --if dbg then print(">",x_pack) end
         for x_minor_index=0,3 do
             local x_val = get_packed_12(x_pack, x_minor_index)
             row[i] = x_val
@@ -244,13 +235,13 @@ local function chunk_gen_mesh_striped_rowfetch_stitch(chunk_block_data,cx,cy,cz,
             if y==31 and ny_data then
                 chunk_get_row(ny_data,row_ny,0,z)
             else
-                chunk_get_row(chunk_block_data,row_ny,math.min(y+1,31),z)
+                chunk_get_row(chunk_block_data,row_ny,min(y+1,31),z)
             end
             
             if z==31 and nz_data then
                 chunk_get_row(nz_data,row_nz,y,0)
             else
-                chunk_get_row(chunk_block_data,row_nz,y,math.min(z+1,31))
+                chunk_get_row(chunk_block_data,row_nz,y,min(z+1,31))
             end
 
             for x=0,31 do
@@ -259,7 +250,7 @@ local function chunk_gen_mesh_striped_rowfetch_stitch(chunk_block_data,cx,cy,cz,
                 if x==31 and nx_data then
                     vnx = chunk_get_block(nx_data,0,y,z)
                 else
-                    vnx = row[math.min(x+2,32)]
+                    vnx = row[min(x+2,32)]
                 end
                 local vny = row_ny[x+1]
                 local vnz = row_nz[x+1]
@@ -361,16 +352,88 @@ local function chunk_gen_mesh_striped_rowfetch_stitch(chunk_block_data,cx,cy,cz,
     return mesh_data, quad_count
 end
 
+local config = {
+    dimensions = Vector(4,4,4),
+    blockTypes = {
+        face={},
+        checkers={},
+        purple={},
+        stripes={}
+    },
+    generator = function(x,y,z)
+        local c = rz < math.sin(rx/8)*8 + math.cos(ry/8)*8 + 64
+        return c and "face" or "air"
+    end
+}
+
+-- maps id -> info table
+-- maps name -> id
+local block_info = {
+    {"air",0,0,0,0,0,0,0,0,0,0,0,0},
+    air=1
+}
+-- info table: 
+    -- numeric indexes = frequently used shit
+        -- name
+        -- face data
+        -- extra mesh data
+    -- string indexes = callbacks and shit
+
 local chunks = {}
+local function chunk_key(x,y,z)
+    return x+y*1024+z*1048576
+end
 
+local atlas_texture
 local function setup()
-    local t1 = SysTime()
+    local textures = {}
+    local texture_count=0
+    for k,v in pairs(config.blockTypes) do
+        local default = v.texture or k
+        local tab = {}
+        tab[1] = v.topTexture or default
+        tab[2] = v.bottomTexture or default
+        tab[3] = v.frontTexture or default
+        tab[4] = v.backTexture or default
+        tab[5] = v.leftTexture or default
+        tab[6] = v.rightTexture or default
 
-    for cz=0,3 do
-        for cy=0,3 do
-            for cx=0,3 do
-                local key = cx..":"..cy..":"..cz
-                
+        for _,tex in pairs(tab) do
+            if not textures[tex] then
+                textures[texture_count] = tex
+                textures[tex] = true
+                texture_count=texture_count+1
+            end
+        end
+    end
+    -- 16384
+    atlas_texture = GetRenderTargetEx("__yava_atlas",16,1024,RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,0 --[[point sample?]], CREATERENDERTARGETFLAGS_AUTOMIPMAP, IMAGE_FORMAT_RGBA8888)
+    --atlas_texture = GetRenderTarget("meme_team",256,256)
+
+    render.PushRenderTarget(atlas_texture)
+    cam.Start2D()
+
+    render.Clear(255,0,255,255)
+    surface.SetDrawColor(255,255,255,255)
+    surface.DrawRect(0, 0, 1, 1)
+    for i=0,texture_count-1 do
+        local name = textures[i]
+        local source = Material("yava/"..name..".png")
+
+        surface.SetMaterial(source)
+        surface.DrawTexturedRectUV(0,16+i*32,16,8,0,.5,1,1)
+        surface.DrawTexturedRect(0,24+i*32,16,16)
+        surface.DrawTexturedRectUV(0,40+i*32,16,8,0,0,1,.5)
+        print(">",i,name,source)
+    end
+
+    cam.End2D()
+    render.PopRenderTarget()
+    
+    -- GENERATION
+    --[[for cz=0,config.dimensions.z-1 do
+        for cy=0,config.dimensions.y-1 do
+            for cx=0,config.dimensions.x-1 do
                 local base_block = cz <= 1 and 2 or 0
                 local base_data = rep_packed_12(base_block)
                 local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
@@ -391,7 +454,7 @@ local function setup()
                 end
                 --JIT_WATCH_PAUSE()
 
-                chunks[key] = {x=cx,y=cy,z=cz,block_data=block_data}
+                chunks[chunk_key(cx,cy,cz)] = {x=cx,y=cy,z=cz,block_data=block_data}
                 --print(">>",#block_data)
             end
         end
@@ -451,10 +514,10 @@ local function setup()
     
     local t3 = SysTime()
     
-    return t2-t1, t3-t2
+    return t2-t1, t3-t2]]
 end
 
-if true then
+if false then
     local as = {}
     local bs = {}
     for i=1,21 do
@@ -481,9 +544,10 @@ end
 print("Memory usage:",(memory_sum*8).." bytes")
 print("Memory/block:",string.format("%.2f",(memory_sum*8)/(128*128*128)).." bytes")
 
-local material_base = Material("atlas-ng.png")
-local material = CreateMaterial("yava-atlas", "VertexLitGeneric")
-material:SetTexture("$basetexture",material_base:GetTexture("$basetexture"))
+--local material_base = Material("atlas-ng.png")
+--local material = CreateMaterial("yava-atlas", "VertexLitGeneric")
+--material:SetTexture("$basetexture",material_base:GetTexture("$basetexture"))
+local material = Material("yava-atlas")
 
 local scale = 40
 
@@ -509,4 +573,28 @@ hook.Add("PostDrawOpaqueRenderables","pdoraawa",function()
         end
     end
     cam.PopModelMatrix()
+end)
+
+--local poop = Material("yava/face.png")
+--print(poop:GetTexture("$basetexture"))
+
+
+local atlas_material = CreateMaterial("__yava_atlas_mat", "VertexLitGeneric")
+atlas_material:SetTexture("$basetexture",atlas_texture) -- <--
+
+--local poop_id = surface.GetTextureID("yava/face")
+hook.Add("HUDPaint", "sd0f98sdf", function()
+
+    --[[render.PushRenderTarget(atlas_texture)
+    cam.Start2D()
+    render.Clear(255,0,0,255)
+    surface.DrawRect(0,0,100,100) 
+    cam.End2D()
+    render.PopRenderTarget()]]
+    
+    surface.SetMaterial(atlas_material)
+    surface.SetDrawColor( 255, 255, 255, 255 )
+    surface.DrawTexturedRect(10,10,16,1024)
+
+    --print(poop_id)
 end)
