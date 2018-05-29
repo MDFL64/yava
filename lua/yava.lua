@@ -19,8 +19,70 @@ function yava.init(config)
     setDefault("basePos", Vector(0,0,0))
     setDefault("chunkDimensions", Vector(4,4,4))
     setDefault("blockScale", 40)
+    setDefault("generator", function() return "void" end)
+
+    yava._vmatrix = Matrix()
+
+    yava._vmatrix:Translate( config.basePos )
+    yava._vmatrix:Scale( Vector( 1, 1, 1 ) * config.blockScale )
 
     yava._buildAtlas()
+    yava._buildChunks()
+end
+
+function yava._buildAtlas() 
+    -- ATLAS SETUP
+    -- 16384
+    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,1024,RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,0 --[[point sample?]], CREATERENDERTARGETFLAGS_AUTOMIPMAP, IMAGE_FORMAT_RGBA8888)
+
+    render.PushRenderTarget(atlas_texture)
+    cam.Start2D()
+
+    render.Clear(255,0,255,255)
+    surface.SetDrawColor(255,255,255,255)
+    for i=1,#yava._images do
+        local name = yava._images[i]
+        local source = Material("yava/"..name..".png")
+
+        surface.SetMaterial(source)
+        surface.DrawTexturedRectUV(0,i*32-16,16,8,0,.5,1,1)
+        surface.DrawTexturedRect(0,i*32-8,16,16)
+        surface.DrawTexturedRectUV(0,i*32+8,16,8,0,0,1,.5)
+    end
+
+    cam.End2D()
+    render.PopRenderTarget()
+
+    yava._atlas = CreateMaterial("__yava_atlas", "VertexLitGeneric")
+    yava._atlas:SetTexture("$basetexture",atlas_texture)
+end
+
+yava._chunks = {}
+yava._stale_chunk_set = {}
+
+function yava._chunkKey(x,y,z)
+    return x+y*1024+z*1048576
+end
+
+function yava._buildChunks()
+    local dims = yava._config.chunkDimensions
+    for z=0,dims.z-1 do
+        for y=0,dims.y-1 do
+            for x=0,dims.x-1 do
+                local chunk = yava._chunkInit(x,y,z)
+                yava._chunks[yava._chunkKey(x,y,z)] = chunk
+                yava._stale_chunk_set[chunk] = true
+            end
+        end
+    end
+end
+
+function yava._updateChunks()
+    local chunk = next(yava._stale_chunk_set)
+    if not chunk then return end
+
+    chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z)
+    yava._stale_chunk_set[chunk] = nil
 end
 
 yava._blockTypes = {}
@@ -37,8 +99,8 @@ function yava.addBlockType(name,settings)
     yava._blockTypes[block_id+1] = settings
     yava._blockTypes[name] = settings
 
-    settings[1] = name
-    settings[2] = block_id
+    settings[1] = block_id
+    settings[2] = name
     
     local defaultImage = settings.faceImage or name
     local imageTable = {
@@ -74,8 +136,30 @@ function yava.addBlockType(name,settings)
     end
 end
 
-yava.addBlockType("air",{faceType = yava.FACE_NONE})
+yava.addBlockType("void",{faceType = yava.FACE_NONE})
 
-function yava._buildAtlas() 
-    print("build atlas now plz")
-end
+include("yava_chunk.lua")
+
+hook.Add("PostDrawOpaqueRenderables","yava_render",function()
+    yava._updateChunks()
+
+    render.SuppressEngineLighting(true) 
+    render.SetModelLighting(BOX_TOP,    1,1,1 )
+    render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )
+    render.SetModelLighting(BOX_RIGHT,  .6,.6,.6 )
+    render.SetModelLighting(BOX_LEFT,   .5,.5,.5 )
+    render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
+    render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )
+    
+    render.SetMaterial( yava._atlas )
+
+    cam.PushModelMatrix( yava._vmatrix )
+    for _,chunk in pairs(yava._chunks) do
+        if chunk.mesh then
+            chunk.mesh:Draw()
+        end
+    end
+    cam.PopModelMatrix()
+
+    render.SuppressEngineLighting(false) 
+end)

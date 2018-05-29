@@ -20,10 +20,6 @@ include("yava_lib/blockTypes.lua")
 
 local chunks = {}]]
 
-local function chunk_key(x,y,z)
-    return x+y*1024+z*1048576
-end
-
 function yava.start()
 
     yava._setupBlockTypes()

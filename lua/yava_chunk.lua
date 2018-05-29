@@ -343,9 +343,64 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
         end
     end
 
-    return mesh_data, quad_count
+    if quad_count>0 then
+        my_mesh = Mesh()
+        
+        local index = 1
+        local normal = Vector()
+        local pos = Vector()
+        mesh.Begin(my_mesh,MATERIAL_QUADS,quad_count)
+        for i=1,quad_count do
+            normal.x = mesh_data[index]
+            normal.y = mesh_data[index+1]
+            normal.z = mesh_data[index+2]
+            index = index+3
+            
+            for j=1,4 do
+                pos.x = mesh_data[index]
+                pos.y = mesh_data[index+1]
+                pos.z = mesh_data[index+2]
+                local u = mesh_data[index+3]
+                local v = mesh_data[index+4]
+                index = index+5
+                
+                mesh.Position(pos)
+                mesh.Normal(normal)
+                mesh.TexCoord(0, u, v)        
+                mesh.AdvanceVertex()
+            end
+        end
+        mesh.End()
+
+        return my_mesh
+    else
+        return nil
+    end
 end
 
-yava._chunk_set_block = chunk_set_block
-yava._chunk_get_block = chunk_get_block
-yava._chunk_gen_mesh  = chunk_gen_mesh
+-- TODO base block
+function yava._chunkInit(cx,cy,cz)
+    local generator = yava._config.generator
+    local blockTypes = yava._blockTypes
+
+    local base_block = "void"
+    local base_id = blockTypes[base_block][1]
+    local base_data = rep_packed_12(base_id)
+    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
+
+    for rz=0,31 do
+        for ry=0,31 do
+            for rx=0,31 do
+                local block = generator(cx*32+rx, cy*32+ry, cz*32+rz)
+                local id = blockTypes[block][1]
+                chunk_set_block(block_data,rx,ry,rz,id)
+            end
+        end
+    end
+
+    return {x=cx,y=cy,z=cz,block_data=block_data}
+end
+
+yava._chunkSetBlock = chunk_set_block
+yava._chunkGetBlock = chunk_get_block
+yava._chunkGenMesh  = chunk_gen_mesh
