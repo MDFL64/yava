@@ -1,13 +1,13 @@
 
 if SERVER then return end
 include("yava_lib/jit_watch.lua")
-include("yava_lib/textures.lua")
+include("yava_lib/blockTypes.lua")
 
 
 -- maps id -> info table
 -- maps name -> id
 -- {name,(opacity,tex)*6,mesh_data?}
-local block_info = {
+--[[local block_info = {
     {"air",0,0,0,0,0,0,0,0,0,0,0,0},
     air=1
 }
@@ -18,20 +18,18 @@ local block_info = {
         -- extra mesh data
     -- string indexes = callbacks and shit
 
-local chunks = {}
+local chunks = {}]]
+
 local function chunk_key(x,y,z)
     return x+y*1024+z*1048576
 end
 
-function yava.setup(config)
-    yava.config = config
+function yava.start()
 
-    yava._setup_atlas()
+    yava._setupBlockTypes()
 
-    yava._setup_blockdata()
-
-    yava.setup = function()
-        error("Yava has already initialized.")
+    yava.start = function()
+        error("Yava has already started.")
     end
     
     -- GENERATION
@@ -136,19 +134,28 @@ if false then
     print(bs[1],bs[7],bs[14],bs[21])
 end
 
-yava.setup{
-    dimensions = Vector(4,4,4),
-    block_types = {
-        face={},
-        checkers={},
-        purple={},
-        stripes={}
-    },
-    generator = function(x,y,z)
-        local c = rz < math.sin(rx/8)*8 + math.cos(ry/8)*8 + 64
-        return c and "face" or "air"
-    end
-}
+yava.addBlockType("face")
+yava.addBlockType("checkers")
+yava.addBlockType("purple")
+yava.addBlockType("stripes")
+
+--[[
+yava.addBlock("tile",{
+    faceImage = "tileSide",
+    faceType = yava.FACE_TRANSPARENT,
+    topType = yava.FACE_NONE,
+    bottomImage = "tileBottom",
+    bottomType = yava.FACE_OPAQUE
+})]]
+
+yava.chunkDimensions = Vector(4,4,4)
+
+yava.generator = function(x,y,z)
+    local c = rz < math.sin(rx/8)*8 + math.cos(ry/8)*8 + 64
+    return c and "face" or "air"
+end
+
+yava.start()
 
 --JIT_WATCH_PRINT()
 --[[
