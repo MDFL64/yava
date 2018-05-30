@@ -16,7 +16,7 @@ function yava.init(config)
         config[key] = value
     end
 
-    setDefault("basePos", Vector(0,0,0))
+    setDefault("basePos", Vector(-5000,-2000,0))
     setDefault("chunkDimensions", Vector(4,4,4))
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
@@ -30,10 +30,8 @@ function yava.init(config)
     yava._buildChunks()
 end
 
-function yava._buildAtlas() 
-    -- ATLAS SETUP
-    -- 16384
-    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,1024,RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,0 --[[point sample?]], CREATERENDERTARGETFLAGS_AUTOMIPMAP, IMAGE_FORMAT_RGBA8888)
+function yava._buildAtlas()
+    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,0 --[[point sample?]], CREATERENDERTARGETFLAGS_AUTOMIPMAP, IMAGE_FORMAT_RGBA8888)
 
     render.PushRenderTarget(atlas_texture)
     cam.Start2D()
@@ -45,9 +43,9 @@ function yava._buildAtlas()
         local source = Material("yava/"..name..".png")
 
         surface.SetMaterial(source)
-        surface.DrawTexturedRectUV(0,i*32-16,16,8,0,.5,1,1)
-        surface.DrawTexturedRect(0,i*32-8,16,16)
-        surface.DrawTexturedRectUV(0,i*32+8,16,8,0,0,1,.5)
+        surface.DrawTexturedRectUV(0,(i-1)*32,16,8,0,.5,1,1)
+        surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
+        surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,0,0,1,.5)
     end
 
     cam.End2D()
@@ -77,11 +75,16 @@ function yava._buildChunks()
     end
 end
 
+local nul_table = {}
 function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return end
 
-    chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z)
+    local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
+    local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
+    local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
+
+    chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
     yava._stale_chunk_set[chunk] = nil
 end
 

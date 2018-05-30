@@ -173,7 +173,15 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
 
     local i = 1
     local quad_count = 0
-    local function add_quad(x1,y1,z1,   x2,y2,z2,   x3,y3,z3,   x4,y4,z4,   xn,yn,zn)
+    
+    local tsize = 16/16384
+    local tmult = 32/16384
+
+    local blockTypes = yava._blockTypes
+    
+    local function add_quad(x1,y1,z1,   x2,y2,z2,   x3,y3,z3,   x4,y4,z4,   xn,yn,zn,   t,tspan)
+        t = (t - .75)*tmult
+
         mesh_data[i] =      xn
         mesh_data[i+1] =    yn
         mesh_data[i+2] =    zn
@@ -182,25 +190,25 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
         mesh_data[i+4] =    y1+cy
         mesh_data[i+5] =    z1+cz
         mesh_data[i+6] =    0
-        mesh_data[i+7] =    .5
+        mesh_data[i+7] =    t+tsize
 
         mesh_data[i+8] =    x2+cx
         mesh_data[i+9] =    y2+cy
         mesh_data[i+10] =   z2+cz
-        mesh_data[i+11] =   .5
-        mesh_data[i+12] =   .5
+        mesh_data[i+11] =   tspan
+        mesh_data[i+12] =   t+tsize
 
         mesh_data[i+13] =   x4+cx
         mesh_data[i+14] =   y4+cy
         mesh_data[i+15] =   z4+cz
-        mesh_data[i+16] =   .5
-        mesh_data[i+17] =   0
+        mesh_data[i+16] =   tspan
+        mesh_data[i+17] =   t
 
         mesh_data[i+18] =   x3+cx
         mesh_data[i+19] =   y3+cy
         mesh_data[i+20] =   z3+cz
         mesh_data[i+21] =   0
-        mesh_data[i+22] =   0
+        mesh_data[i+22] =   t
 
         i = i+23
         quad_count = quad_count+1
@@ -239,52 +247,44 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
             end
 
             for x=0,31 do
-                local v = row[x+1]
+                local v = blockTypes[row[x+1]+1]
                 local vnx
                 if x==31 and nx_data then
-                    vnx = chunk_get_block(nx_data,0,y,z)
+                    vnx = blockTypes[chunk_get_block(nx_data,0,y,z)+1]
                 else
-                    vnx = row[min(x+2,32)]
+                    vnx = blockTypes[row[min(x+2,32)]+1]
                 end
-                local vny = row_ny[x+1]
-                local vnz = row_nz[x+1]
+                local vny = blockTypes[row_ny[x+1]+1]
+                local vnz = blockTypes[row_nz[x+1]+1]
                 
                 --local tx = 0
                 local tx = 0
                 local ty = 0
                 local tz = 0
 
-                if v != 0 then
-                    if vnx == 0 then
-                        tx = 1
-                    end
+                if v[3] ~= 0 and vnx[9] == 0 then
+                    tx = v[3]
+                elseif v[3] == 0 and vnx[9] ~= 0 then
+                    tx = -vnx[9]
+                end
 
-                    if vny == 0 then
-                        ty = 1
-                    end
-                    
-                    if vnz == 0 then
-                        tz = 1
-                    end
-                else
-                    if vnx != 0 then
-                        tx = -1
-                    end
+                if v[5] ~= 0 and vny[11] == 0 then
+                    ty = v[5]
+                elseif v[5] == 0 and vny[11] ~= 0 then
+                    ty = -vny[11]
+                end
 
-                    if vny != 0 then
-                        ty = -1
-                    end
-
-                    if vnz != 0 then
-                        tz = -1
-                    end
+                if v[7] ~= 0 and vnz[13] == 0 then
+                    tz = v[7]
+                elseif v[7] == 0 and vnz[13] ~= 0 then
+                    tz = -vnz[13]
                 end
                 
                 if tx != ltx[x+1] then
                     if ltx[x+1] > 0 then
-                        add_quad(   x+1,y,z,      x+1,ltx_start[x+1],z,    x+1,y,z+1,    x+1,ltx_start[x+1],z+1,      1,0,0)
+                        add_quad(   x+1,y,z,      x+1,ltx_start[x+1],z,    x+1,y,z+1,    x+1,ltx_start[x+1],z+1,      1,0,0,    ltx[x+1],y-ltx_start[x+1])
                     elseif ltx[x+1] < 0 then
-                        add_quad(   x+1,ltx_start[x+1],z,        x+1,y,z,  x+1,ltx_start[x+1],z+1,      x+1,y,z+1,    -1,0,0)
+                        add_quad(   x+1,ltx_start[x+1],z,        x+1,y,z,  x+1,ltx_start[x+1],z+1,      x+1,y,z+1,    -1,0,0,   -ltx[x+1],y-ltx_start[x+1])
                     end
                     ltx[x+1] = tx
                     ltx_start[x+1] = y
@@ -292,9 +292,9 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
 
                 if ty != lty then
                     if lty > 0 then
-                        add_quad(   lty_start,y+1,z,        x,y+1,z,  lty_start,y+1,z+1,      x,y+1,z+1,    0,1,0)
+                        add_quad(   lty_start,y+1,z,        x,y+1,z,  lty_start,y+1,z+1,      x,y+1,z+1,    0,1,0,      lty,x-lty_start)
                     elseif lty < 0 then
-                        add_quad(   x,y+1,z,      lty_start,y+1,z,    x,y+1,z+1,    lty_start,y+1,z+1,      0,-1,0)
+                        add_quad(   x,y+1,z,      lty_start,y+1,z,    x,y+1,z+1,    lty_start,y+1,z+1,      0,-1,0,     -lty,x-lty_start)
                     end
                     lty = ty
                     lty_start = x
@@ -302,9 +302,9 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
 
                 if tz != ltz then
                     if ltz > 0 then
-                        add_quad(   x,y,z+1,      ltz_start,y,z+1,    x,y+1,z+1,    ltz_start,y+1,z+1,      0,0,1)
+                        add_quad(   x,y,z+1,      ltz_start,y,z+1,    x,y+1,z+1,    ltz_start,y+1,z+1,      0,0,1,      ltz,x-ltz_start)
                     elseif ltz < 0 then
-                        add_quad(   x,y+1,z+1,    ltz_start,y+1,z+1,  x,y,z+1,      ltz_start,y,z+1,        0,0,-1)
+                        add_quad(   x,y+1,z+1,    ltz_start,y+1,z+1,  x,y,z+1,      ltz_start,y,z+1,        0,0,-1,     -ltz,x-ltz_start)
                     end
                     ltz = tz
                     ltz_start = x
@@ -315,17 +315,17 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
 
             if 0 != lty then
                 if lty > 0 then
-                    add_quad(   lty_start,y+1,z,        x,y+1,z,  lty_start,y+1,z+1,      x,y+1,z+1,    0,1,0)
+                    add_quad(   lty_start,y+1,z,        x,y+1,z,  lty_start,y+1,z+1,      x,y+1,z+1,    0,1,0,      lty,x-lty_start)
                 elseif lty < 0 then
-                    add_quad(   x,y+1,z,      lty_start,y+1,z,    x,y+1,z+1,    lty_start,y+1,z+1,      0,-1,0)
+                    add_quad(   x,y+1,z,      lty_start,y+1,z,    x,y+1,z+1,    lty_start,y+1,z+1,      0,-1,0,     -lty,x-lty_start)
                 end
             end
 
             if 0 != ltz then
                 if ltz > 0 then
-                    add_quad(   x,y,z+1,      ltz_start,y,z+1,    x,y+1,z+1,    ltz_start,y+1,z+1,      0,0,1)
+                    add_quad(   x,y,z+1,      ltz_start,y,z+1,    x,y+1,z+1,    ltz_start,y+1,z+1,      0,0,1,      ltz,x-ltz_start)
                 elseif ltz < 0 then
-                    add_quad(   x,y+1,z+1,    ltz_start,y+1,z+1,  x,y,z+1,      ltz_start,y,z+1,        0,0,-1)
+                    add_quad(   x,y+1,z+1,    ltz_start,y+1,z+1,  x,y,z+1,      ltz_start,y,z+1,        0,0,-1,     -ltz,x-ltz_start)
                 end
             end
         end
@@ -335,9 +335,9 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
         for x = 0,31 do
             if 0 != ltx[x+1] then
                 if ltx[x+1] > 0 then
-                    add_quad(   x+1,y,z,      x+1,ltx_start[x+1],z,    x+1,y,z+1,    x+1,ltx_start[x+1],z+1,      1,0,0)
+                    add_quad(   x+1,y,z,      x+1,ltx_start[x+1],z,    x+1,y,z+1,    x+1,ltx_start[x+1],z+1,      1,0,0,    ltx[x+1],y-ltx_start[x+1])
                 elseif ltx[x+1] < 0 then
-                    add_quad(   x+1,ltx_start[x+1],z,        x+1,y,z,  x+1,ltx_start[x+1],z+1,      x+1,y,z+1,    -1,0,0)
+                    add_quad(   x+1,ltx_start[x+1],z,        x+1,y,z,  x+1,ltx_start[x+1],z+1,      x+1,y,z+1,    -1,0,0,   -ltx[x+1],y-ltx_start[x+1])
                 end
             end
         end
