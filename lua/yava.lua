@@ -31,7 +31,9 @@ function yava.init(config)
 end
 
 function yava._buildAtlas()
-    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,0 --[[point sample?]], CREATERENDERTARGETFLAGS_AUTOMIPMAP, IMAGE_FORMAT_RGBA8888)
+    local pointSample = true
+    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,
+        RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
 
     render.PushRenderTarget(atlas_texture)
     cam.Start2D()
@@ -107,21 +109,21 @@ function yava.addBlockType(name,settings)
     
     local defaultImage = settings.faceImage or name
     local imageTable = {
-        settings.frontImage or defaultImage,
-        settings.leftImage or defaultImage,
-        settings.topImage or defaultImage,
-        settings.backImage or defaultImage,
         settings.rightImage or defaultImage,
+        settings.backImage or defaultImage,
+        settings.topImage or defaultImage,
+        settings.leftImage or defaultImage,
+        settings.frontImage or defaultImage,
         settings.bottomImage or defaultImage
     }
     
     local defaultType = settings.faceType or yava.FACE_OPAQUE
     local typeTable = {
-        settings.frontType or defaultType,
-        settings.leftType or defaultType,
-        settings.topType or defaultType,
-        settings.backType or defaultType,
         settings.rightType or defaultType,
+        settings.backType or defaultType,
+        settings.topType or defaultType,
+        settings.leftType or defaultType,
+        settings.frontType or defaultType,
         settings.bottomType or defaultType
     }
     

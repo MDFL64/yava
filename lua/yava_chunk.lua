@@ -189,25 +189,25 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
         mesh_data[i+3] =    x1+cx
         mesh_data[i+4] =    y1+cy
         mesh_data[i+5] =    z1+cz
-        mesh_data[i+6] =    0
+        mesh_data[i+6] =    tspan
         mesh_data[i+7] =    t+tsize
 
         mesh_data[i+8] =    x2+cx
         mesh_data[i+9] =    y2+cy
         mesh_data[i+10] =   z2+cz
-        mesh_data[i+11] =   tspan
+        mesh_data[i+11] =   0
         mesh_data[i+12] =   t+tsize
 
         mesh_data[i+13] =   x4+cx
         mesh_data[i+14] =   y4+cy
         mesh_data[i+15] =   z4+cz
-        mesh_data[i+16] =   tspan
+        mesh_data[i+16] =   0
         mesh_data[i+17] =   t
 
         mesh_data[i+18] =   x3+cx
         mesh_data[i+19] =   y3+cy
         mesh_data[i+20] =   z3+cz
-        mesh_data[i+21] =   0
+        mesh_data[i+21] =   tspan
         mesh_data[i+22] =   t
 
         i = i+23
