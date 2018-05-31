@@ -9,7 +9,6 @@ end
 
 function yava.init(config)
     config = config or {}
-    yava._config = config
     
     local function setDefault(key,value)
         if config[key] then return end
@@ -26,35 +25,42 @@ function yava.init(config)
     yava._vmatrix:Translate( config.basePos )
     yava._vmatrix:Scale( Vector( 1, 1, 1 ) * config.blockScale )
 
-    yava._buildAtlas()
-    yava._buildChunks()
+    yava._generator = config.generator
+
+    --if CLIENT then
+        yava._buildAtlas()
+    --else
+        yava._buildChunks( config.chunkDimensions )
+    --end
 end
 
-function yava._buildAtlas()
-    local pointSample = true
-    local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,
-        RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
+if CLIENT then
+    function yava._buildAtlas()
+        local pointSample = true
+        local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,
+            RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
 
-    render.PushRenderTarget(atlas_texture)
-    cam.Start2D()
+        render.PushRenderTarget(atlas_texture)
+        cam.Start2D()
 
-    render.Clear(255,0,255,255)
-    surface.SetDrawColor(255,255,255,255)
-    for i=1,#yava._images do
-        local name = yava._images[i]
-        local source = Material("yava/"..name..".png")
+        render.Clear(255,0,255,255)
+        surface.SetDrawColor(255,255,255,255)
+        for i=1,#yava._images do
+            local name = yava._images[i]
+            local source = Material("yava/"..name..".png")
 
-        surface.SetMaterial(source)
-        surface.DrawTexturedRectUV(0,(i-1)*32,16,8,0,.5,1,1)
-        surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
-        surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,0,0,1,.5)
+            surface.SetMaterial(source)
+            surface.DrawTexturedRectUV(0,(i-1)*32,16,8,0,.5,1,1)
+            surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
+            surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,0,0,1,.5)
+        end
+
+        cam.End2D()
+        render.PopRenderTarget()
+
+        yava._atlas = CreateMaterial("__yava_atlas", "VertexLitGeneric")
+        yava._atlas:SetTexture("$basetexture",atlas_texture)
     end
-
-    cam.End2D()
-    render.PopRenderTarget()
-
-    yava._atlas = CreateMaterial("__yava_atlas", "VertexLitGeneric")
-    yava._atlas:SetTexture("$basetexture",atlas_texture)
 end
 
 yava._chunks = {}
@@ -64,8 +70,7 @@ function yava._chunkKey(x,y,z)
     return x+y*1024+z*1048576
 end
 
-function yava._buildChunks()
-    local dims = yava._config.chunkDimensions
+function yava._buildChunks(dims)
     for z=0,dims.z-1 do
         for y=0,dims.y-1 do
             for x=0,dims.x-1 do
@@ -90,22 +95,23 @@ function yava._updateChunks()
     yava._stale_chunk_set[chunk] = nil
 end
 
+-- maps (name -> id) and (id+1 -> name)
 yava._blockTypes = {}
+-- each subtable maps (id+1 -> data)
+yava._blockFaceImages = {{},{},{},{},{},{}}
+yava._blockFaceTypes = {{},{},{},{},{},{}}
+-- maps (name -> index) and (index -> name)
 yava._images = {}
 
 local next_block_id = 0
 function yava.addBlockType(name,settings)
-    if yava._config then error("Cannot add block types after init.") end
-
+    if yava._generator then error("Cannot add block types after init.") end
     settings = settings or {}
 
     local block_id = #yava._blockTypes
 
-    yava._blockTypes[block_id+1] = settings
-    yava._blockTypes[name] = settings
-
-    settings[1] = block_id
-    settings[2] = name
+    yava._blockTypes[block_id+1] = name
+    yava._blockTypes[name] = block_id
     
     local defaultImage = settings.faceImage or name
     local imageTable = {
@@ -136,8 +142,8 @@ function yava.addBlockType(name,settings)
     end
     
     for i=1,6 do
-        settings[i*2+1] = yava._images[imageTable[i]] or 0
-        settings[i*2+2] = typeTable[i]
+        yava._blockFaceImages[i][block_id+1] = yava._images[imageTable[i]] or 0
+        yava._blockFaceTypes[i][block_id+1] = typeTable[i]
     end
 end
 

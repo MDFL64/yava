@@ -34,7 +34,7 @@ yava.init{
             return "purple"
         end
         
-        if x>30 and x<45 then
+        if x>20+math.sin(y/40)*10 and x<45+math.sin(y/10)*5 then
             if z<10 then
                 return "stripes"
             end

@@ -177,7 +177,8 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
     local tsize = 16/16384
     local tmult = 32/16384
 
-    local blockTypes = yava._blockTypes
+    local blockFaceImages = yava._blockFaceImages
+    local blockFaceTypes = yava._blockFaceTypes
     
     local function add_quad(x1,y1,z1,   x2,y2,z2,   x3,y3,z3,   x4,y4,z4,   xn,yn,zn,   t,tspan)
         t = (t - .75)*tmult
@@ -247,37 +248,37 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
             end
 
             for x=0,31 do
-                local v = blockTypes[row[x+1]+1]
+                local v = row[x+1]+1
                 local vnx
                 if x==31 and nx_data then
-                    vnx = blockTypes[chunk_get_block(nx_data,0,y,z)+1]
+                    vnx = chunk_get_block(nx_data,0,y,z)+1
                 else
-                    vnx = blockTypes[row[min(x+2,32)]+1]
+                    vnx = row[min(x+2,32)]+1
                 end
-                local vny = blockTypes[row_ny[x+1]+1]
-                local vnz = blockTypes[row_nz[x+1]+1]
+                local vny = row_ny[x+1]+1
+                local vnz = row_nz[x+1]+1
                 
                 --local tx = 0
                 local tx = 0
                 local ty = 0
                 local tz = 0
 
-                if v[3] ~= 0 and vnx[9] == 0 then
-                    tx = v[3]
-                elseif v[3] == 0 and vnx[9] ~= 0 then
-                    tx = -vnx[9]
+                if blockFaceImages[1][v] ~= 0 and blockFaceImages[4][vnx] == 0 then
+                    tx = blockFaceImages[1][v]
+                elseif blockFaceImages[1][v] == 0 and blockFaceImages[4][vnx] ~= 0 then
+                    tx = -blockFaceImages[4][vnx]
                 end
 
-                if v[5] ~= 0 and vny[11] == 0 then
-                    ty = v[5]
-                elseif v[5] == 0 and vny[11] ~= 0 then
-                    ty = -vny[11]
+                if blockFaceImages[2][v] ~= 0 and blockFaceImages[5][vny] == 0 then
+                    ty = blockFaceImages[2][v]
+                elseif blockFaceImages[2][v] == 0 and blockFaceImages[5][vny] ~= 0 then
+                    ty = -blockFaceImages[5][vny]
                 end
 
-                if v[7] ~= 0 and vnz[13] == 0 then
-                    tz = v[7]
-                elseif v[7] == 0 and vnz[13] ~= 0 then
-                    tz = -vnz[13]
+                if blockFaceImages[3][v] ~= 0 and blockFaceImages[6][vnz] == 0 then
+                    tz = blockFaceImages[3][v]
+                elseif blockFaceImages[3][v] == 0 and blockFaceImages[6][vnz] ~= 0 then
+                    tz = -blockFaceImages[6][vnz]
                 end
                 
                 if tx != ltx[x+1] then
@@ -380,11 +381,11 @@ end
 
 -- TODO base block
 function yava._chunkInit(cx,cy,cz)
-    local generator = yava._config.generator
+    local generator = yava._generator
     local blockTypes = yava._blockTypes
 
-    local base_block = "void"
-    local base_id = blockTypes[base_block][1]
+    local base_block = "dirt"
+    local base_id = blockTypes[base_block]
     local base_data = rep_packed_12(base_id)
     local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
 
@@ -392,7 +393,7 @@ function yava._chunkInit(cx,cy,cz)
         for ry=0,31 do
             for rx=0,31 do
                 local block = generator(cx*32+rx, cy*32+ry, cz*32+rz)
-                local id = blockTypes[block][1]
+                local id = blockTypes[block]
                 chunk_set_block(block_data,rx,ry,rz,id)
             end
         end
