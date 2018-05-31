@@ -380,11 +380,11 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
 end
 
 -- TODO base block
-function yava._chunkInit(cx,cy,cz)
+function yava._chunkGenerate(cx,cy,cz)
     local generator = yava._generator
     local blockTypes = yava._blockTypes
 
-    local base_block = "dirt"
+    local base_block = "void"
     local base_id = blockTypes[base_block]
     local base_data = rep_packed_12(base_id)
     local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}

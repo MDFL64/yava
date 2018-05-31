@@ -15,7 +15,7 @@ function yava.init(config)
         config[key] = value
     end
 
-    setDefault("basePos", Vector(-5000,-2000,0))
+    setDefault("basePos", Vector(-5000,-2000,2000))
     setDefault("chunkDimensions", Vector(4,4,4))
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
@@ -27,11 +27,14 @@ function yava.init(config)
 
     yava._generator = config.generator
 
-    --if CLIENT then
+    if CLIENT then
         yava._buildAtlas()
-    --else
+    else
         yava._buildChunks( config.chunkDimensions )
-    --end
+        for _,ply in pairs(player.GetHumans()) do
+            yava._addClient(ply)
+        end
+    end
 end
 
 if CLIENT then
@@ -70,13 +73,15 @@ function yava._chunkKey(x,y,z)
     return x+y*1024+z*1048576
 end
 
-function yava._buildChunks(dims)
-    for z=0,dims.z-1 do
-        for y=0,dims.y-1 do
-            for x=0,dims.x-1 do
-                local chunk = yava._chunkInit(x,y,z)
-                yava._chunks[yava._chunkKey(x,y,z)] = chunk
-                yava._stale_chunk_set[chunk] = true
+if SERVER then
+    function yava._buildChunks(dims)
+        for z=0,dims.z-1 do
+            for y=0,dims.y-1 do
+                for x=0,dims.x-1 do
+                    local chunk = yava._chunkGenerate(x,y,z)
+                    yava._chunks[yava._chunkKey(x,y,z)] = chunk
+                    yava._stale_chunk_set[chunk] = true
+                end
             end
         end
     end
@@ -87,21 +92,26 @@ function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return end
 
-    local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
-    local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
-    local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
+    if CLIENT then
+        local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
+        local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
+        local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
+    
+        chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
+    end
 
-    chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
     yava._stale_chunk_set[chunk] = nil
 end
 
 -- maps (name -> id) and (id+1 -> name)
 yava._blockTypes = {}
 -- each subtable maps (id+1 -> data)
-yava._blockFaceImages = {{},{},{},{},{},{}}
-yava._blockFaceTypes = {{},{},{},{},{},{}}
--- maps (name -> index) and (index -> name)
-yava._images = {}
+if CLIENT then
+    yava._blockFaceImages = {{},{},{},{},{},{}}
+    yava._blockFaceTypes = {{},{},{},{},{},{}}
+    -- maps (name -> index) and (index -> name)
+    yava._images = {}
+end
 
 local next_block_id = 0
 function yava.addBlockType(name,settings)
@@ -113,37 +123,39 @@ function yava.addBlockType(name,settings)
     yava._blockTypes[block_id+1] = name
     yava._blockTypes[name] = block_id
     
-    local defaultImage = settings.faceImage or name
-    local imageTable = {
-        settings.rightImage or defaultImage,
-        settings.backImage or defaultImage,
-        settings.topImage or defaultImage,
-        settings.leftImage or defaultImage,
-        settings.frontImage or defaultImage,
-        settings.bottomImage or defaultImage
-    }
-    
-    local defaultType = settings.faceType or yava.FACE_OPAQUE
-    local typeTable = {
-        settings.rightType or defaultType,
-        settings.backType or defaultType,
-        settings.topType or defaultType,
-        settings.leftType or defaultType,
-        settings.frontType or defaultType,
-        settings.bottomType or defaultType
-    }
-    
-    for i,img_name in pairs(imageTable) do
-        if not yava._images[img_name] and typeTable[i] ~= 0 then
-            local img_id = #yava._images+1
-            yava._images[img_id] = img_name
-            yava._images[img_name] = img_id
+    if CLIENT then
+        local defaultImage = settings.faceImage or name
+        local imageTable = {
+            settings.rightImage or defaultImage,
+            settings.backImage or defaultImage,
+            settings.topImage or defaultImage,
+            settings.leftImage or defaultImage,
+            settings.frontImage or defaultImage,
+            settings.bottomImage or defaultImage
+        }
+        
+        local defaultType = settings.faceType or yava.FACE_OPAQUE
+        local typeTable = {
+            settings.rightType or defaultType,
+            settings.backType or defaultType,
+            settings.topType or defaultType,
+            settings.leftType or defaultType,
+            settings.frontType or defaultType,
+            settings.bottomType or defaultType
+        }
+        
+        for i,img_name in pairs(imageTable) do
+            if not yava._images[img_name] and typeTable[i] ~= 0 then
+                local img_id = #yava._images+1
+                yava._images[img_id] = img_name
+                yava._images[img_name] = img_id
+            end
         end
-    end
-    
-    for i=1,6 do
-        yava._blockFaceImages[i][block_id+1] = yava._images[imageTable[i]] or 0
-        yava._blockFaceTypes[i][block_id+1] = typeTable[i]
+        
+        for i=1,6 do
+            yava._blockFaceImages[i][block_id+1] = yava._images[imageTable[i]] or 0
+            yava._blockFaceTypes[i][block_id+1] = typeTable[i]
+        end
     end
 end
 
@@ -151,26 +163,122 @@ yava.addBlockType("void",{faceType = yava.FACE_NONE})
 
 include("yava_chunk.lua")
 
-hook.Add("PostDrawOpaqueRenderables","yava_render",function()
+hook.Add("Think","yava_update",function()
     yava._updateChunks()
 
-    render.SuppressEngineLighting(true) 
-    render.SetModelLighting(BOX_TOP,    1,1,1 )
-    render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )
-    render.SetModelLighting(BOX_RIGHT,  .6,.6,.6 )
-    render.SetModelLighting(BOX_LEFT,   .5,.5,.5 )
-    render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
-    render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )
-    
-    render.SetMaterial( yava._atlas )
-
-    cam.PushModelMatrix( yava._vmatrix )
-    for _,chunk in pairs(yava._chunks) do
-        if chunk.mesh then
-            chunk.mesh:Draw()
-        end
+    if SERVER then
+        yava._sendChunks()
     end
-    cam.PopModelMatrix()
-
-    render.SuppressEngineLighting(false) 
 end)
+
+if CLIENT then
+    hook.Add("PostDrawOpaqueRenderables","yava_render",function()
+        render.SuppressEngineLighting(true) 
+        render.SetModelLighting(BOX_TOP,    1,1,1 )
+        render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )
+        render.SetModelLighting(BOX_RIGHT,  .6,.6,.6 )
+        render.SetModelLighting(BOX_LEFT,   .5,.5,.5 )
+        render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
+        render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )
+        
+        render.SetMaterial( yava._atlas )
+
+        cam.PushModelMatrix( yava._vmatrix )
+        for _,chunk in pairs(yava._chunks) do
+            if chunk.mesh then
+                chunk.mesh:Draw()
+            end
+        end
+        cam.PopModelMatrix()
+
+        render.SuppressEngineLighting(false) 
+    end)
+
+    net.Receive("yava_chunk_blocks", function(bitlen)
+        local x = net.ReadUInt(16)
+        local y = net.ReadUInt(16)
+        local z = net.ReadUInt(16)
+        local len = net.ReadUInt(16)
+
+        local block_data = {}
+        for i=1,len do
+            local n = net.ReadUInt(24)
+            n = n+net.ReadUInt(24)*16777216
+            table.insert(block_data,n)
+        end
+
+        local chunk = {x=x,y=y,z=z,block_data=block_data}
+        yava._chunks[yava._chunkKey(x,y,z)] = chunk
+        yava._stale_chunk_set[chunk] = true
+
+        local next_chunk = yava._chunks[yava._chunkKey(x-1,y,z)]
+        if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+        local next_chunk = yava._chunks[yava._chunkKey(x,y-1,z)]
+        if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+        local next_chunk = yava._chunks[yava._chunkKey(x,y,z-1)]
+        if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+    end)
+else
+    -- the last client we tried to send a chunk to
+    -- used for a round-robin scheme
+    util.AddNetworkString("yava_chunk_blocks")
+
+    yava._currentClient = nil
+    yava._clients = {}
+
+    hook.Add("PlayerInitialSpawn","yava_player_join",function(ply)
+        yava._addClient(ply)
+    end)
+
+    function yava._addClient(ply)
+        if yava._clients[ply] then return end
+
+        yava._clients[ply] = {}
+        for _,chunk in pairs(yava._chunks) do
+            yava._clients[ply][chunk] = true
+        end
+
+        print("adding client",ply)
+    end
+
+    local nextChunk = 0
+    function yava._sendChunks()
+        if SysTime()<nextChunk then
+            return
+        end
+
+        yava._currentClient = next(yava._clients,yava._currentClient)
+        if not IsValid(yava._currentClient) then
+            if yava._currentClient ~= nil then
+                yava._clients[yava._currentClient] = nil
+                yava._currentClient = nil
+            end
+            return
+        end
+
+        local client_table = yava._clients[yava._currentClient]
+
+        local send_chunk = next(client_table)
+
+        if not send_chunk then return end
+        
+        -- send the chunk
+        net.Start("yava_chunk_blocks")
+        net.WriteUInt(send_chunk.x, 16)
+        net.WriteUInt(send_chunk.y, 16)
+        net.WriteUInt(send_chunk.z, 16)
+        net.WriteUInt(#send_chunk.block_data, 16)
+
+        for i=1,#send_chunk.block_data do
+            local n = send_chunk.block_data[i]
+            net.WriteUInt(bit.band(n,0xFFFFFF), 24)
+            net.WriteUInt(bit.band(math.floor(n/16777216),0xFFFFFF), 24)
+        end
+
+        net.Send(yava._currentClient)
+        
+        nextChunk = SysTime() + (#send_chunk.block_data)/100000
+
+        client_table[send_chunk] = nil
+    end
+end

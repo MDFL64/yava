@@ -1,5 +1,3 @@
-if SERVER then return end
-
 include("yava.lua")
 
 yava.addBlockType("face")
@@ -35,14 +33,14 @@ yava.init{
         end
         
         if x>20+math.sin(y/40)*10 and x<45+math.sin(y/10)*5 then
-            if z<10 then
+            if z<3 then
                 return "stripes"
             end
             if math.random()<.001 then return "test" end
             return "void"
         end
 
-        local lvl = math.sin(x/16)*5 + math.sin(y/16)*10 + 30
+        local lvl = math.sin(x/16)*5 + math.sin(y/16)*20 + 30
         if z<lvl then
             if lvl-z < 1 then
                 return "grass"
