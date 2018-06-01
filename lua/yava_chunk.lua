@@ -122,7 +122,7 @@ local function chunk_get_block(chunk_block_data,x,y,z)
     return get_packed_12(chunk_block_data[rshift(x,2)+pack_addr], band(x,3))
 end
 
-local function chunk_get_row(chunk_block_data,row,y,z,dbg)
+local function chunk_get_row(chunk_block_data,row,y,z)
 
     -- z
     local val = get_packed_12(chunk_block_data[rshift(z,2)+1], band(z,3))
@@ -160,13 +160,86 @@ local function chunk_get_row(chunk_block_data,row,y,z,dbg)
     end
 end
 
+local function chunk_set_row(chunk_block_data,y,z,v)
+    
+    local pack_addr
+
+    -- z 
+    do
+        local major_index = rshift(z,2) + 1
+        local minor_index = band(z,3)
+        local pack = chunk_block_data[major_index]
+        local val = get_packed_12(pack, minor_index)
+
+        if band(val,0x800)==0 then
+            if val == v then
+                -- no change needed
+                return
+            end
+
+            local base_addr = #chunk_block_data
+            pack_addr = base_addr+1
+            chunk_block_data[major_index] = edit_packed_12(pack, minor_index, val, bor(rshift(base_addr,3),2048))
+            
+            local tmp = rep_packed_12(val)
+            for addr = pack_addr,pack_addr+7 do
+                chunk_block_data[addr] = tmp
+            end
+        else
+            pack_addr = band(val,0x7FF)*8+1
+        end
+    end
+
+    -- y
+    do
+        local major_index = rshift(y,2) + pack_addr
+        local minor_index = band(y,3)
+        local pack = chunk_block_data[major_index]
+        local val = get_packed_12(pack, minor_index)
+
+        if band(val,0x800)==0 then
+            if val == v then
+                -- no change needed
+                return
+            end
+
+            chunk_block_data[major_index] = edit_packed_12(pack, minor_index, val, v)
+        else
+            error("Row already has blocks.")
+        end
+    end
+
+end
+
+local function chunk_set_slice(chunk_block_data,z,v)
+    
+    -- z 
+    do
+        local major_index = rshift(z,2) + 1
+        local minor_index = band(z,3)
+        local pack = chunk_block_data[major_index]
+        local val = get_packed_12(pack, minor_index)
+
+        if band(val,0x800)==0 then
+            if val == v then
+                -- no change needed
+                return
+            end
+
+            chunk_block_data[major_index] = edit_packed_12(pack, minor_index, val, v)
+        else
+            error("Slice already has rows.")
+        end
+    end
+end
+
 local mesh_data = {}
 local row    = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local row_ny = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local row_nz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local ltx =         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local ltx_start =   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
+function yava._chunkGenMesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
     cx=cx*32
     cy=cy*32
     cz=cz*32
@@ -379,7 +452,6 @@ local function chunk_gen_mesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
     end
 end
 
--- TODO base block
 function yava._chunkGenerate(cx,cy,cz)
     local generator = yava._generator
     local blockTypes = yava._blockTypes
@@ -402,6 +474,86 @@ function yava._chunkGenerate(cx,cy,cz)
     return {x=cx,y=cy,z=cz,block_data=block_data}
 end
 
+function yava._chunkGenerateAlternate(cx,cy,cz)
+    local consumer, block_data = yava._chunkConsumerConstruct()
+    yava._chunkProvideGenerate(cx,cy,cz,consumer)
+    return {x=cx,y=cy,z=cz,block_data=block_data}
+end
+
+function yava._chunkProvideGenerate(cx,cy,cz,consumer)
+    local generator = yava._generator
+    local blockTypes = yava._blockTypes
+
+    local blockType = ""
+    local blockCount = 0
+    for z=0,31 do
+        for y=0,31 do
+            for x=0,31 do
+                local block = generator(cx*32+x, cy*32+y, cz*32+z)
+                if blockType == nil  then
+                    blockType = block
+                    blockCount = 1
+                elseif blockType == block then
+                    blockCount = blockCount + 1
+                else
+                    --print(blockType,blockTypes[blockType],blockCount)
+                    consumer(blockTypes[blockType],blockCount)
+                    blockType = block
+                    blockCount = 1
+                end
+            end
+        end
+    end
+    consumer(blockTypes[blockType],blockCount)
+end
+
+function yava._chunkConsumerConstruct()
+    local base_block = "void"
+    local base_data = rep_packed_12(yava._blockTypes[base_block])
+    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
+
+    local x,y,z = 0,0,0
+    local function consumer(type,count)
+        --print("===>",type,count)
+        while z<32 do
+            
+            if y==0 and x==0 and count>=1024 then
+                -- add whole slice
+                chunk_set_slice(block_data,z,type)
+                
+                count = count-1024
+            else
+                while y<32 do
+                    if x==0 and count>=32 then
+                        -- add whole row
+                        chunk_set_row(block_data,y,z,type)
+    
+                        count = count-32
+                    else
+                        -- add individual blocks
+                        while x<32 do
+                            if count==0 then return end
+    
+                            chunk_set_block(block_data,x,y,z,type)
+    
+                            count=count-1
+                            x=x+1
+                        end
+                    end
+    
+                    x=0
+                    y=y+1
+                end
+            end
+
+            y=0
+            z=z+1
+        end
+    end
+    return consumer, block_data
+end
+
+
 yava._chunkSetBlock = chunk_set_block
 yava._chunkGetBlock = chunk_get_block
-yava._chunkGenMesh  = chunk_gen_mesh
+

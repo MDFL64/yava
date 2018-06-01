@@ -28,16 +28,26 @@ function yava.init(config)
     yava._generator = config.generator
 
     if CLIENT then
-        yava._buildAtlas()
+        timer.Simple(0,function()
+            print("atlas")
+            yava._buildAtlas()
+        end)
     else
         yava._buildChunks( config.chunkDimensions )
         for _,ply in pairs(player.GetHumans()) do
             yava._addClient(ply)
         end
     end
+
+    yava._isSetup = true
 end
 
 if CLIENT then
+
+    --[[hook.Add("Initialize","yava_buildAtlas",function()
+        yava._buildAtlas()
+    end)]]
+
     function yava._buildAtlas()
         local pointSample = true
         local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,
@@ -78,12 +88,18 @@ if SERVER then
         for z=0,dims.z-1 do
             for y=0,dims.y-1 do
                 for x=0,dims.x-1 do
-                    local chunk = yava._chunkGenerate(x,y,z)
+                    local chunk = yava._chunkGenerateAlternate(x,y,z)
                     yava._chunks[yava._chunkKey(x,y,z)] = chunk
                     yava._stale_chunk_set[chunk] = true
                 end
             end
         end
+
+        local sum = 0
+        for _,chunk in pairs(yava._chunks) do
+            sum = sum + #chunk.block_data
+        end
+        print(sum*8)
     end
 end
 
@@ -115,7 +131,7 @@ end
 
 local next_block_id = 0
 function yava.addBlockType(name,settings)
-    if yava._generator then error("Cannot add block types after init.") end
+    if yava._isSetup then error("Cannot add block types after init.") end
     settings = settings or {}
 
     local block_id = #yava._blockTypes
@@ -181,7 +197,9 @@ if CLIENT then
         render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
         render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )
         
-        render.SetMaterial( yava._atlas )
+        if yava._atlas then
+            render.SetMaterial( yava._atlas )
+        end
 
         cam.PushModelMatrix( yava._vmatrix )
         for _,chunk in pairs(yava._chunks) do

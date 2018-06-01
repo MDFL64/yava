@@ -1,7 +1,9 @@
 include("yava.lua")
 
-yava.addBlockType("face")
 yava.addBlockType("checkers")
+yava.addBlockType("rock")
+
+yava.addBlockType("face")
 yava.addBlockType("purple")
 yava.addBlockType("stripes")
 yava.addBlockType("test",{
@@ -12,7 +14,6 @@ yava.addBlockType("test",{
     topImage = "test_top",
     bottomImage = "test_bottom"
 })
-yava.addBlockType("rock")
 yava.addBlockType("dirt")
 yava.addBlockType("grass",{
     topImage = "grass_top",
@@ -54,11 +55,3 @@ yava.init{
         end
     end
 }
-
---[[hook.Add("HUDPaint", "sd0f98sdf", function()
-    
-    surface.SetMaterial(yava._atlas)
-    surface.SetDrawColor( 255, 255, 255, 255 )
-    surface.DrawTexturedRect(10,10,16,16384)
-
-end)]]
