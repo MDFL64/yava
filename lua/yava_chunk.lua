@@ -1,6 +1,7 @@
 local band = bit.band
 local bor = bit.bor
 local rshift = bit.rshift
+local lshift = bit.lshift
 local floor = math.floor
 local min = math.min
 
@@ -452,40 +453,36 @@ function yava._chunkGenMesh(chunk_block_data,cx,cy,cz,nx_data,ny_data,nz_data)
     end
 end
 
-function yava._chunkGenerate(cx,cy,cz)
-    local generator = yava._generator
-    local blockTypes = yava._blockTypes
+-- currently suboptimal!
+function yava._chunkProvideChunk(chunk,consumer)
+    local block_data = chunk.block_data
 
-    local base_block = "void"
-    local base_id = blockTypes[base_block]
-    local base_data = rep_packed_12(base_id)
-    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
-
-    for rz=0,31 do
-        for ry=0,31 do
-            for rx=0,31 do
-                local block = generator(cx*32+rx, cy*32+ry, cz*32+rz)
-                local id = blockTypes[block]
-                chunk_set_block(block_data,rx,ry,rz,id)
+    local blockType, blockCount
+    for z=0,31 do
+        for y=0,31 do
+            for x=0,31 do
+                local block = chunk_get_block(block_data,x,y,z)
+                if blockType == nil  then
+                    blockType = block
+                    blockCount = 1
+                elseif blockType == block then
+                    blockCount = blockCount + 1
+                else
+                    consumer(blockType,blockCount)
+                    blockType = block
+                    blockCount = 1
+                end
             end
         end
     end
-
-    return {x=cx,y=cy,z=cz,block_data=block_data}
-end
-
-function yava._chunkGenerateAlternate(cx,cy,cz)
-    local consumer, block_data = yava._chunkConsumerConstruct()
-    yava._chunkProvideGenerate(cx,cy,cz,consumer)
-    return {x=cx,y=cy,z=cz,block_data=block_data}
+    consumer(blockType,blockCount)
 end
 
 function yava._chunkProvideGenerate(cx,cy,cz,consumer)
     local generator = yava._generator
     local blockTypes = yava._blockTypes
 
-    local blockType = ""
-    local blockCount = 0
+    local blockType, blockCount
     for z=0,31 do
         for y=0,31 do
             for x=0,31 do
@@ -496,7 +493,6 @@ function yava._chunkProvideGenerate(cx,cy,cz,consumer)
                 elseif blockType == block then
                     blockCount = blockCount + 1
                 else
-                    --print(blockType,blockTypes[blockType],blockCount)
                     consumer(blockTypes[blockType],blockCount)
                     blockType = block
                     blockCount = 1
@@ -507,7 +503,7 @@ function yava._chunkProvideGenerate(cx,cy,cz,consumer)
     consumer(blockTypes[blockType],blockCount)
 end
 
-function yava._chunkConsumerConstruct()
+function yava._chunkConsumerConstruct(cx,cy,cz)
     local base_block = "void"
     local base_data = rep_packed_12(yava._blockTypes[base_block])
     local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
@@ -550,9 +546,60 @@ function yava._chunkConsumerConstruct()
             z=z+1
         end
     end
-    return consumer, block_data
+    return consumer, {x=cx,y=cy,z=cz,block_data=block_data}
 end
 
+local function writeVarWidth(n)
+    repeat
+        local bits = band(n,0x7F)
+        n = rshift(n,7)
+        if n~=0 then bits=bits+0x80 end
+        net.WriteUInt(bits, 8)
+    until n==0
+end
+
+local function readVarWidth()
+    local n=0
+    local s=0
+    repeat
+        local bits = net.ReadUInt(8)
+        n = bor(n,lshift(band(bits,0x7F),s))
+        s=s+7
+    until band(bits,0x80)==0
+    return n
+end
+
+function yava._chunkConsumerNetwork()
+    local function consumer(type,count)
+        type = type*2
+        if count == 1 then
+            writeVarWidth(type)
+        else
+            writeVarWidth(type+1)
+            writeVarWidth(count)
+        end
+    end
+    local function finalizer()
+        writeVarWidth(0xFFFF)
+    end
+    return consumer, finalizer
+end
+
+function yava._chunkProvideNetwork(consumer)
+    local failsafe = 0
+    while failsafe<1000000 do
+        local type = readVarWidth()
+        --print(string.format("%x",type))
+        if type==0xFFFF then break end
+        if type%2==1 then
+            consumer(rshift(type,1),readVarWidth())
+        else
+            consumer(rshift(type,1),1)
+        end
+        failsafe=failsafe+1
+    end
+    if failsafe==1000000 then error("rer") end
+end
 
 yava._chunkSetBlock = chunk_set_block
 yava._chunkGetBlock = chunk_get_block
