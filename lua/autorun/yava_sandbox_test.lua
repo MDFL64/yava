@@ -32,13 +32,13 @@ yava.init{
             return "face"
         end
 
-        if ((x-60)^2 + (y-60)^2 + (z-100)^2)^.5 < 30 then
+        if ((x-200)^2 + (y-200)^2 + (z-100)^2)^.5 < 30 then
             return "checkers"
-        elseif ((x-60)^2 + (y-60)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
+        elseif ((x-200)^2 + (y-200)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
             return "purple"
         end
         
-        if x>20+math.sin(y/40)*10 and x<45+math.sin(y/10)*5 then
+        if x>300+math.sin(y/40)*10 and x<350+math.sin(y/10)*5 then
             if z<3 then
                 return "stripes"
             end

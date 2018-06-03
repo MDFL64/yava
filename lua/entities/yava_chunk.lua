@@ -10,6 +10,7 @@ function ENT:UpdateTransmitState()
 	return TRANSMIT_NEVER
 end
 
+local count = 0
 function ENT:SetupCollisions(soup,mins,maxs)
     print("creating")
     self:PhysicsFromMesh(soup)
@@ -24,7 +25,8 @@ function ENT:SetupCollisions(soup,mins,maxs)
 
     self.correct_mins = mins
     self.correct_maxs = maxs
-    print("created")
+    count = count + 1
+    print("created",count)
 end
 
 --[[function ENT:TestCollision() 

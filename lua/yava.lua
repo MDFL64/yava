@@ -28,7 +28,7 @@ function yava.init(config)
     end
 
     setDefault("basePos", Vector(-12800,-12800,0))
-    setDefault("chunkDimensions", Vector(4,4,4))
+    setDefault("chunkDimensions", Vector(20,20,5))
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
 
@@ -57,10 +57,6 @@ end
 
 if CLIENT then
 
-    --[[hook.Add("Initialize","yava_buildAtlas",function()
-        yava._buildAtlas()
-    end)]]
-
     function yava._buildAtlas()
         local pointSample = true
         local atlas_texture = GetRenderTargetEx("__yava_atlas",16,16384,
@@ -69,7 +65,7 @@ if CLIENT then
         render.PushRenderTarget(atlas_texture)
         cam.Start2D()
 
-        render.Clear(255,0,255,255)
+        render.Clear(0,0,0,255)
         surface.SetDrawColor(255,255,255,255)
         for i=1,#yava._images do
             local name = yava._images[i]
