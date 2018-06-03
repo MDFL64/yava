@@ -9,6 +9,16 @@ do -- CONSTANTS
     yava.FACE_OPAQUE = 3
 end
 
+
+-- Kill old chunk colliders
+if SERVER then
+    print("deleting")
+    for _, ent in pairs( ents.FindByClass( "yava_chunk" ) ) do
+        ent:Remove()
+    end
+    print("deleted")
+end
+
 function yava.init(config)
     config = config or {}
     
@@ -17,7 +27,7 @@ function yava.init(config)
         config[key] = value
     end
 
-    setDefault("basePos", Vector(-5000,-2000,2000))
+    setDefault("basePos", Vector(-12800,-12800,0))
     setDefault("chunkDimensions", Vector(4,4,4))
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
@@ -104,7 +114,7 @@ if SERVER then
         for _,chunk in pairs(yava._chunks) do
             sum = sum + #chunk.block_data
         end
-        print(sum*8)
+        --print(sum*8)
     end
 end
 
@@ -126,13 +136,25 @@ function yava._updateChunks()
         local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
         local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
 
-        local soup_data = yava._chunkGenPhysics_dirtySoup(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
+        local soup = yava._chunkGenPhysics_dirtySoup(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
 
-        if soup_data then
+        if soup then
             if SERVER then
+                if IsValid(chunk.collider_ent) then
+                    -- todo try reusing it instead
+                    print("delete old")
+                    chunk.collider_ent:Remove()
+                    print("delete old done")
+                end
+                
+                local mins = yava._offset + Vector(chunk.x,chunk.y,chunk.z)*yava._scale*32
+                local maxs = mins + Vector(32,32,32)*yava._scale
+
                 local e = ents.Create("yava_chunk")
-                e:SetupCollisions(soup_data)
                 e:Spawn()
+                e:SetupCollisions(soup,mins,maxs)
+
+                chunk.collider_ent = e
             else
                 --[[local ed = EffectData()
                 util.Effect("yava_chunk_cl", ed)
@@ -272,18 +294,7 @@ if CLIENT then
 
         local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
         yava._chunkProvideNetwork(consumer)
-        --print("~",#chunk.block_data)
-        
-        --[[local len = net.ReadUInt(16)
 
-        local block_data = {}
-        for i=1,len do
-            local n = net.ReadUInt(24)
-            n = n+net.ReadUInt(24)*16777216
-            table.insert(block_data,n)
-        end
-
-        local chunk = {x=x,y=y,z=z,block_data=block_data}]]
         yava._chunks[yava._chunkKey(x,y,z)] = chunk
         yava._stale_chunk_set[chunk] = true
 
@@ -295,7 +306,7 @@ if CLIENT then
         if next_chunk then yava._stale_chunk_set[next_chunk] = true end
 
         bitsum = bitsum+bitlen
-        print("networked bytes:",bitsum/8)
+        --print("networked bytes:",bitsum/8)
     end)
 else
     -- the last client we tried to send a chunk to
@@ -363,3 +374,12 @@ else
         client_table[send_chunk] = nil
     end
 end
+
+-- Don't let players screw with our voxels!
+hook.Add("PhysgunPickup", "yava_nophysgun", function(ply,ent)
+	if ent:GetClass() == "yava_chunk" then return false end
+end)
+
+hook.Add("CanTool", "yava_notool", function(ply,tr,tool)
+	if IsValid(tr.Entity) and tr.Entity:GetClass() == "yava_chunk" then return false end
+end)

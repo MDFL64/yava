@@ -1,3 +1,6 @@
+
+if game.GetMap()~="yava_void" or GetConVar("gamemode"):GetString()~="sandbox" then return end
+
 AddCSLuaFile()
 
 include("yava.lua")
@@ -57,3 +60,7 @@ yava.init{
         end
     end
 }
+
+hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
+    ply:SetPos(Vector(-9000, -8000, 3000))
+end)

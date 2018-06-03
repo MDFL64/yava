@@ -10,18 +10,21 @@ function ENT:UpdateTransmitState()
 	return TRANSMIT_NEVER
 end
 
-function ENT:SetupCollisions(soup)
+function ENT:SetupCollisions(soup,mins,maxs)
+    print("creating")
+    self:PhysicsFromMesh(soup)
+    self:GetPhysicsObject():EnableMotion(false)
+
     self:EnableCustomCollisions(true)
     
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetSolid(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_VPHYSICS)
 
-    self:PhysicsFromMesh(soup)
-    self:GetPhysicsObject():EnableMotion(false)
-    
-    --self:SetCollisionBounds(Vector(-6000,-6000,-6000), Vector(6000,6000,6000) )
-    --self:PhysicsInit(SOLID_VPHYSICS)
+
+    self.correct_mins = mins
+    self.correct_maxs = maxs
+    print("created")
 end
 
 --[[function ENT:TestCollision() 
@@ -31,8 +34,10 @@ end
 end]]
 
 function ENT:Think()
-    --print("~")
-    self:SetCollisionBounds(Vector(-6000,-6000,-6000), Vector(6000,6000,6000) )
+    local mins = self.correct_mins
+    local maxs = self.correct_maxs
+
+    self:SetCollisionBounds(mins, maxs)
 end
 
 --[[function ENT:Draw()
