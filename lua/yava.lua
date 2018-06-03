@@ -1,3 +1,5 @@
+AddCSLuaFile()
+
 yava = {}
 
 do -- CONSTANTS
@@ -22,8 +24,10 @@ function yava.init(config)
 
     yava._vmatrix = Matrix()
 
-    yava._vmatrix:Translate( config.basePos )
-    yava._vmatrix:Scale( Vector( 1, 1, 1 ) * config.blockScale )
+    yava._offset = config.basePos
+    yava._scale = config.blockScale
+    yava._vmatrix:Translate( yava._offset )
+    yava._vmatrix:Scale( Vector( 1, 1, 1 ) * yava._scale )
 
     yava._generator = config.generator
 
@@ -105,6 +109,7 @@ if SERVER then
 end
 
 local nul_table = {}
+--local cl_table = {}
 function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return end
@@ -115,6 +120,38 @@ function yava._updateChunks()
         local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
     
         chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
+    end
+    do
+        local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
+        local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
+        local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
+
+        local soup_data = yava._chunkGenPhysics_dirtySoup(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
+
+        if soup_data then
+            if SERVER then
+                local e = ents.Create("yava_chunk")
+                e:SetupCollisions(soup_data)
+                e:Spawn()
+            else
+                --[[local ed = EffectData()
+                util.Effect("yava_chunk_cl", ed)
+                local e = yava._new_chunk_ent
+
+                do
+                    --e:EnableCustomCollisions(true)
+        
+                    e:PhysicsInit(SOLID_VPHYSICS)
+                    e:SetSolid(SOLID_VPHYSICS)
+                    e:SetMoveType(MOVETYPE_VPHYSICS)
+                
+                    e:PhysicsFromMesh(soup_data)
+                    e:GetPhysicsObject():EnableMotion(false)
+                    --local m = e:GetPhysicsObject():GetMesh()
+                end]]
+            end
+            --print("~~",e)
+        end
     end
 
     yava._stale_chunk_set[chunk] = nil
@@ -129,6 +166,8 @@ if CLIENT then
     -- maps (name -> index) and (index -> name)
     yava._images = {}
 end
+
+yava._blockSolidity = {}
 
 local next_block_id = 0
 function yava.addBlockType(name,settings)
@@ -174,11 +213,16 @@ function yava.addBlockType(name,settings)
             yava._blockFaceTypes[i][block_id+1] = typeTable[i]
         end
     end
+
+    local solid = settings.solid
+    if solid == nil then solid = true end
+
+    yava._blockSolidity[block_id+1] = solid
 end
 
-yava.addBlockType("void",{faceType = yava.FACE_NONE})
+yava.addBlockType("void",{faceType = yava.FACE_NONE, solid = false})
 
-include("yava_chunk.lua")
+include("yava_lib_chunk.lua")
 
 hook.Add("Think","yava_update",function()
     yava._updateChunks()
@@ -190,6 +234,9 @@ end)
 
 if CLIENT then
     hook.Add("PostDrawOpaqueRenderables","yava_render",function()
+        
+        if not yava._isSetup then return end
+        
         render.SuppressEngineLighting(true) 
         render.SetModelLighting(BOX_TOP,    1,1,1 )
         render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )

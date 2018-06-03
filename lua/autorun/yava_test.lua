@@ -1,3 +1,5 @@
+AddCSLuaFile()
+
 include("yava.lua")
 
 yava.addBlockType("checkers")
