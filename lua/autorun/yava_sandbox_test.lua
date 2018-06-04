@@ -63,4 +63,28 @@ yava.init{
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:SetPos(Vector(-9000, -8000, 3000))
+    ply:Give("yava_gun")
 end)
+
+if SERVER then
+    concommand.Add("blockme",function()
+        yava.setBlock(math.random(30,35),math.random(30,35),math.random(40,80),"purple")
+    end)
+else
+    hook.Add("Initialize","yava_setup_ui",function()
+		CreateClientConVar("yava_brush_mat","purple", false, true)
+
+		local combo = g_ContextMenu:Add("DComboBox")
+		combo:SetPos(20,130)
+        combo:SetWide(200)
+        
+        for i=1,#yava._blockTypes do
+            local type = yava._blockTypes[i]
+		    combo:AddChoice(type,nil,type=="purple")
+        end
+
+        combo.OnSelect = function(self,index,value,data)
+			RunConsoleCommand("yava_brush_mat",value)
+        end
+    end)
+end

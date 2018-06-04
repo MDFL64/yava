@@ -12,7 +12,7 @@ end
 
 local count = 0
 function ENT:SetupCollisions(soup,mins,maxs)
-    print("creating")
+    --print("creating")
     self:PhysicsFromMesh(soup)
     self:GetPhysicsObject():EnableMotion(false)
 
@@ -26,7 +26,7 @@ function ENT:SetupCollisions(soup,mins,maxs)
     self.correct_mins = mins
     self.correct_maxs = maxs
     count = count + 1
-    print("created",count)
+    --print("created",count)
 end
 
 --[[function ENT:TestCollision() 

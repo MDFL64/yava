@@ -12,11 +12,11 @@ end
 
 -- Kill old chunk colliders
 if SERVER then
-    print("deleting")
+    --print("deleting")
     for _, ent in pairs( ents.FindByClass( "yava_chunk" ) ) do
         ent:Remove()
     end
-    print("deleted")
+    --print("deleted")
 end
 
 function yava.init(config)
@@ -127,21 +127,22 @@ function yava._updateChunks()
     
         chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
     end
-    do
+    if SERVER then
         local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
         local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
         local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
 
         local soup = yava._chunkGenPhysics_dirtySoup(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
 
+        if IsValid(chunk.collider_ent) then
+            -- todo try reusing it instead
+            --print("delete old")
+            chunk.collider_ent:Remove()
+            --print("delete old done")
+        end
+
         if soup then
             if SERVER then
-                if IsValid(chunk.collider_ent) then
-                    -- todo try reusing it instead
-                    print("delete old")
-                    chunk.collider_ent:Remove()
-                    print("delete old done")
-                end
                 
                 local mins = yava._offset + Vector(chunk.x,chunk.y,chunk.z)*yava._scale*32
                 local maxs = mins + Vector(32,32,32)*yava._scale
@@ -305,10 +306,11 @@ if CLIENT then
         --print("networked bytes:",bitsum/8)
     end)
 else
+    util.AddNetworkString("yava_chunk_blocks")
+    util.AddNetworkString("yava_block")    
+
     -- the last client we tried to send a chunk to
     -- used for a round-robin scheme
-    util.AddNetworkString("yava_chunk_blocks")
-
     yava._currentClient = nil
     yava._clients = {}
 
@@ -369,6 +371,66 @@ else
 
         client_table[send_chunk] = nil
     end
+end
+
+local function set_block(x,y,z,v)
+    local cx = math.floor(x/32)
+    local cy = math.floor(y/32)
+    local cz = math.floor(z/32)
+    local lx = x%32
+    local ly = y%32
+    local lz = z%32
+    
+    local chunk = yava._chunks[yava._chunkKey(cx,cy,cz)]
+    
+    if chunk and v then
+        yava._chunkSetBlock(chunk.block_data,lx,ly,lz,v)
+        yava._stale_chunk_set[chunk] = true
+        
+        if lx==0 then
+            local next_chunk = yava._chunks[yava._chunkKey(cx-1,cy,cz)]
+            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+        end
+        if ly==0 then
+            local next_chunk = yava._chunks[yava._chunkKey(cx,cy-1,cz)]
+            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+        end
+        if lz==0 then
+            local next_chunk = yava._chunks[yava._chunkKey(cx,cy,cz-1)]
+            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+        end
+
+        if SERVER then
+            net.Start("yava_block")
+            net.WriteInt(x,16) 
+            net.WriteInt(y,16)
+            net.WriteInt(z,16)
+            net.WriteInt(v,16)
+            net.Broadcast() 
+        end
+    end
+end
+
+if SERVER then
+    yava.setBlock = function(x,y,z,type)
+        --print(x,y,z,type)
+        local v = yava._blockTypes[type]
+        set_block(x,y,z,v)
+    end
+else
+    net.Receive("yava_block", function(bitlen)
+        local x = net.ReadUInt(16)
+        local y = net.ReadUInt(16)
+        local z = net.ReadUInt(16)
+        local v = net.ReadUInt(16)
+        
+        set_block(x,y,z,v)
+    end)
+end
+
+function yava.worldPosToBlockCoords(pos)
+    local coords = (pos - yava._offset) / yava._scale
+    return math.floor(coords.x), math.floor(coords.y), math.floor(coords.z)
 end
 
 -- Don't let players screw with our voxels!
