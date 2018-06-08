@@ -1,0 +1,16 @@
+{
+    "ignore": [
+        ".git/*",
+        "yava_icon.*",
+        "LICENSE",
+        "README.md"
+    ],
+    "logo": "yava_icon.jpg",
+    "tags": [
+        "fun",
+        "scenic"
+    ],
+    "title": "YAVA",
+    "type": "tool",
+    "workshopid": 1402515908
+}
