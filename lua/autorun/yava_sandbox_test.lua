@@ -26,6 +26,13 @@ yava.addBlockType("grass",{
     topImage = "grass_top",
     bottomImage = "dirt"
 })
+yava.addBlockType("tree",{
+    topImage = "tree_top",
+    bottomImage = "tree_top"
+})
+yava.addBlockType("leaves")
+yava.addBlockType("wood")
+yava.addBlockType("sand")
 
 yava.init{
     imageDir = "yava_test",
