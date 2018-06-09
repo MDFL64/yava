@@ -1,3 +1,5 @@
+AddCSLuaFile()
+
 yava.changes = [[
 A2: 
     [Testbed]
@@ -6,7 +8,7 @@ A2:
     - Explosions destroy terrain.
     [API]
     - Bulk modification functions.
-    - Image directory config option.
+    - Image directory config setting.
     [Internal]
     - Faster chunk networking. Chunk data is sent as quickly as possible over an unreliable channel.
     - Faster mesh generation. Generator will now spend about 5ms on mesh generation each frame.

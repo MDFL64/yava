@@ -1,7 +1,7 @@
 
-print("YAVA #1")
+--print("YAVA #1")
 if game.GetMap()~="yava_void" or GetConVar("gamemode"):GetString()~="sandbox" then return end
-print("YAVA #2")
+--print("YAVA #2")
 
 AddCSLuaFile()
 
@@ -28,6 +28,7 @@ yava.addBlockType("grass",{
 })
 
 yava.init{
+    imageDir = "yava_test",
     generator = function(x,y,z)
         
         if x==70 and y==70 then

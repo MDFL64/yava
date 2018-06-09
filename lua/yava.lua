@@ -31,6 +31,7 @@ function yava.init(config)
     setDefault("chunkDimensions", Vector(20,20,5))
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
+    setDefault("imageDir", ".")
 
     yava._vmatrix = Matrix()
 
@@ -40,6 +41,8 @@ function yava.init(config)
     yava._vmatrix:Scale( Vector( 1, 1, 1 ) * yava._scale )
 
     yava._generator = config.generator
+
+    yava._imageDir = config.imageDir
 
     if CLIENT then
         timer.Simple(0,function()
@@ -65,11 +68,13 @@ if CLIENT then
         render.PushRenderTarget(atlas_texture)
         cam.Start2D()
 
+        local imgDir = yava._imageDir
+
         render.Clear(0,0,0,255)
         surface.SetDrawColor(255,255,255,255)
         for i=1,#yava._images do
             local name = yava._images[i]
-            local source = Material("yava/"..name..".png")
+            local source = Material(imgDir.."/"..name..".png")
 
             surface.SetMaterial(source)
             surface.DrawTexturedRectUV(0,(i-1)*32,16,8,0,.5,1,1)
@@ -348,6 +353,7 @@ else
                 client_info.send_count = client_info.send_count + 1
                 
                 local expire_time = CurTime() - (client:Ping()/500)
+                local n = 0
 
                 for i=1,100 do
                     if client_info.chunks_left <= 0 or client_info.send_count <= 0 then break end
@@ -372,8 +378,10 @@ else
                         client_info.chunks[chunk] = CurTime()
                         
                         client_info.send_count = client_info.send_count - 1
+                        n = n+1
                     end
                 end
+                --print("SENT",n)
             end
         end
         
