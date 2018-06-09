@@ -77,11 +77,7 @@ hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:Give("yava_bulk")    
 end)
 
-if SERVER then
-    concommand.Add("blockme",function()
-        yava.setBlock(math.random(30,35),math.random(30,35),math.random(40,80),"purple")
-    end)
-else
+if CLIENT then
     hook.Add("Initialize","yava_setup_ui",function()
 		CreateClientConVar("yava_brush_mat","purple", false, true)
 
@@ -91,7 +87,9 @@ else
         
         for i=1,#yava._blockTypes do
             local type = yava._blockTypes[i]
-		    combo:AddChoice(type,nil,type=="purple")
+            if type ~= "void" then
+                combo:AddChoice(type,nil,type=="purple")
+            end
         end
 
         combo.OnSelect = function(self,index,value,data)
@@ -106,3 +104,11 @@ else
 		end
 	end)
 end
+
+--[[ atlas test!
+hook.Add("HUDPaint", "yava_atlas_test", function() 
+    surface.SetMaterial(yava._atlas) 
+    surface.SetDrawColor( 255, 255, 255, 255 ) 
+    surface.DrawTexturedRect(10,10,16,16384)
+end)
+]]

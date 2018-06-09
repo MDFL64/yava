@@ -77,9 +77,9 @@ if CLIENT then
             local source = Material(imgDir.."/"..name..".png")
 
             surface.SetMaterial(source)
-            surface.DrawTexturedRectUV(0,(i-1)*32,16,8,0,.5,1,1)
+            surface.DrawTexturedRectUV(0,(i-1)*32,16,8,     0,0,1,0.03125)
             surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
-            surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,0,0,1,.5)
+            surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,  0,0.96875,1,1)
         end
 
         cam.End2D()
