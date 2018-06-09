@@ -124,8 +124,10 @@ function yava._updateChunks()
         local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
         local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
         local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
-    
+        
+        local t = SysTime()
         chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
+        --print("MESHED",#chunk.block_data,SysTime()-t)
     end
     if SERVER then
         local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
@@ -247,7 +249,9 @@ hook.Add("Think","yava_update",function()
     yava._updateChunks()
 
     if SERVER then
+        --for i=1,100 do
         yava._sendChunks()
+        --end
     end
 end)
 
@@ -279,15 +283,11 @@ if CLIENT then
         render.SuppressEngineLighting(false) 
     end)
 
-    local bitsum = 0
-    net.Receive("yava_chunk_blocks", function(bitlen)
+    local rx_chunk_count = 0
+    net.Receive("yava_chunk_blocks", function()
         local x = net.ReadUInt(16)
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
-        
-        --[[local consumer, finalize = yava._chunkConsumerNetwork()
-        yava._chunkProvideChunk(send_chunk,consumer)
-        finalize()]]
 
         local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
         yava._chunkProvideNetwork(consumer)
@@ -302,16 +302,20 @@ if CLIENT then
         local next_chunk = yava._chunks[yava._chunkKey(x,y,z-1)]
         if next_chunk then yava._stale_chunk_set[next_chunk] = true end
 
-        bitsum = bitsum+bitlen
-        --print("networked bytes:",bitsum/8)
+        net.Start("yava_chunk_blocks_ack")
+        net.WriteUInt(x, 16)
+        net.WriteUInt(y, 16)
+        net.WriteUInt(z, 16)
+        net.SendToServer()
+        
+        rx_chunk_count = rx_chunk_count+1
+        --print(rx_chunk_count)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
-    util.AddNetworkString("yava_block")    
+    util.AddNetworkString("yava_chunk_blocks_ack")
+    util.AddNetworkString("yava_block")
 
-    -- the last client we tried to send a chunk to
-    -- used for a round-robin scheme
-    yava._currentClient = nil
     yava._clients = {}
 
     hook.Add("PlayerInitialSpawn","yava_player_join",function(ply)
@@ -321,111 +325,136 @@ else
     function yava._addClient(ply)
         if yava._clients[ply] then return end
 
-        yava._clients[ply] = {}
+        local info = {chunks={},send_count=1,last_chunk=nil,chunks_left=0}
+        yava._clients[ply] = info
         for _,chunk in pairs(yava._chunks) do
-            yava._clients[ply][chunk] = true
+            info.chunks[chunk] = false
+            info.chunks_left = info.chunks_left + 1
         end
     end
 
-    local nextChunk = 0
     function yava._sendChunks()
-        --[[if SysTime()<nextChunk then
-            return
-        end]]
 
-        yava._currentClient = next(yava._clients,yava._currentClient)
-        if not IsValid(yava._currentClient) then
-            if yava._currentClient ~= nil then
-                yava._clients[yava._currentClient] = nil
-                yava._currentClient = nil
+        local removed_clients = {}
+
+        for client, client_info in pairs(yava._clients) do
+
+            if not IsValid(client) then table.insert(removed_clients,client) continue end
+            
+            if client_info.chunks_left > 0 then
+                client_info.send_count = client_info.send_count + 1
+                
+                local expire_time = CurTime() - (client:Ping()/500)
+
+                for i=1,100 do
+                    if client_info.chunks_left <= 0 or client_info.send_count <= 0 then break end
+                    
+                    local chunk,v = next(client_info.chunks,client_info.last_chunk)
+                    client_info.last_chunk = chunk
+                    if chunk == nil then continue end
+                    
+                    if not v or v<expire_time then
+                        -- send the chunk
+                        net.Start("yava_chunk_blocks",true)
+                        net.WriteUInt(chunk.x, 16)
+                        net.WriteUInt(chunk.y, 16)
+                        net.WriteUInt(chunk.z, 16)
+                        
+                        local consumer, finalize = yava._chunkConsumerNetwork()
+                        yava._chunkProvideChunk(chunk,consumer)
+                        finalize()
+                        
+                        net.Send(client,true)
+                        
+                        client_info.chunks[chunk] = CurTime()
+                        
+                        client_info.send_count = client_info.send_count - 1
+                    end
+                end
             end
-            return
         end
-
-        local client_table = yava._clients[yava._currentClient]
-
-        local send_chunk = next(client_table)
-
-        if not send_chunk then return end
         
-        -- send the chunk
-        net.Start("yava_chunk_blocks")
-        net.WriteUInt(send_chunk.x, 16)
-        net.WriteUInt(send_chunk.y, 16)
-        net.WriteUInt(send_chunk.z, 16)
-        --[[net.WriteUInt(#send_chunk.block_data, 16)
-
-        for i=1,#send_chunk.block_data do
-            local n = send_chunk.block_data[i]
-            net.WriteUInt(bit.band(n,0xFFFFFF), 24)
-            net.WriteUInt(bit.band(math.floor(n/16777216),0xFFFFFF), 24)
-        end]]
-
-        local consumer, finalize = yava._chunkConsumerNetwork()
-        yava._chunkProvideChunk(send_chunk,consumer)
-        finalize()
-
-        net.Send(yava._currentClient)
-        
-        nextChunk = SysTime() + (#send_chunk.block_data)/100000
-
-        client_table[send_chunk] = nil
-    end
-end
-
-local function set_block(x,y,z,v)
-    local cx = math.floor(x/32)
-    local cy = math.floor(y/32)
-    local cz = math.floor(z/32)
-    local lx = x%32
-    local ly = y%32
-    local lz = z%32
-    
-    local chunk = yava._chunks[yava._chunkKey(cx,cy,cz)]
-    
-    if chunk and v then
-        yava._chunkSetBlock(chunk.block_data,lx,ly,lz,v)
-        yava._stale_chunk_set[chunk] = true
-        
-        if lx==0 then
-            local next_chunk = yava._chunks[yava._chunkKey(cx-1,cy,cz)]
-            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
-        end
-        if ly==0 then
-            local next_chunk = yava._chunks[yava._chunkKey(cx,cy-1,cz)]
-            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
-        end
-        if lz==0 then
-            local next_chunk = yava._chunks[yava._chunkKey(cx,cy,cz-1)]
-            if next_chunk then yava._stale_chunk_set[next_chunk] = true end
-        end
-
-        if SERVER then
-            net.Start("yava_block")
-            net.WriteInt(x,16) 
-            net.WriteInt(y,16)
-            net.WriteInt(z,16)
-            net.WriteInt(v,16)
-            net.Broadcast() 
+        -- prune client table
+        for _,client in pairs(removed_clients) do
+            yava._clients[client] = nil
         end
     end
-end
 
-if SERVER then
-    yava.setBlock = function(x,y,z,type)
-        --print(x,y,z,type)
-        local v = yava._blockTypes[type]
-        set_block(x,y,z,v)
-    end
-else
-    net.Receive("yava_block", function(bitlen)
+    net.Receive("yava_chunk_blocks_ack", function(len,ply)
         local x = net.ReadUInt(16)
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
-        local v = net.ReadUInt(16)
-        
-        set_block(x,y,z,v)
+
+        local client_info = yava._clients[ply]
+        local chunk = yava._chunks[yava._chunkKey(x,y,z)]
+
+        if client_info and chunk then
+            if client_info.chunks[chunk] ~= nil then
+                client_info.chunks[chunk] = nil
+                client_info.send_count = client_info.send_count + 1
+                client_info.chunks_left = client_info.chunks_left - 1
+                --print("ACK",client_info.send_count,client_info.chunks_left)
+            end
+        end
     end)
+end
+
+-- setBlock crap
+do
+    local function set_block(x,y,z,v)
+        local cx = math.floor(x/32)
+        local cy = math.floor(y/32)
+        local cz = math.floor(z/32)
+        local lx = x%32
+        local ly = y%32
+        local lz = z%32
+        
+        local chunk = yava._chunks[yava._chunkKey(cx,cy,cz)]
+        
+        if chunk and v then
+            yava._chunkSetBlock(chunk.block_data,lx,ly,lz,v)
+            yava._stale_chunk_set[chunk] = true
+            
+            if lx==0 then
+                local next_chunk = yava._chunks[yava._chunkKey(cx-1,cy,cz)]
+                if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+            end
+            if ly==0 then
+                local next_chunk = yava._chunks[yava._chunkKey(cx,cy-1,cz)]
+                if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+            end
+            if lz==0 then
+                local next_chunk = yava._chunks[yava._chunkKey(cx,cy,cz-1)]
+                if next_chunk then yava._stale_chunk_set[next_chunk] = true end
+            end
+
+            if SERVER then
+                net.Start("yava_block")
+                net.WriteInt(x,16) 
+                net.WriteInt(y,16)
+                net.WriteInt(z,16)
+                net.WriteInt(v,16)
+                net.Broadcast() 
+            end
+        end
+    end
+
+    if SERVER then
+        yava.setBlock = function(x,y,z,type)
+            --print(x,y,z,type)
+            local v = yava._blockTypes[type]
+            set_block(x,y,z,v)
+        end
+    else
+        net.Receive("yava_block", function(bitlen)
+            local x = net.ReadUInt(16)
+            local y = net.ReadUInt(16)
+            local z = net.ReadUInt(16)
+            local v = net.ReadUInt(16)
+            
+            set_block(x,y,z,v)
+        end)
+    end
 end
 
 function yava.worldPosToBlockCoords(pos)
