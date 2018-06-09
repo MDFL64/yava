@@ -4,7 +4,9 @@ yava.changes = [[
 A2: 
     [Testbed]
     - New block types.
+    - Removed 'void' as selectable block type.
     - Bulk voxel gun.
+    - Advanced voxel gun.
     - Explosions destroy terrain.
     [API]
     - Bulk modification functions.
@@ -12,7 +14,6 @@ A2:
     [Internal]
     - Faster chunk networking. Chunk data is sent as quickly as possible over an unreliable channel.
     - Faster mesh generation. Generator will now spend about 5ms on mesh generation each frame.
-
 
 A1: June 4, 2018
     [Initial Release]

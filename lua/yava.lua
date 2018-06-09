@@ -323,6 +323,8 @@ else
     util.AddNetworkString("yava_chunk_blocks")
     util.AddNetworkString("yava_chunk_blocks_ack")
     util.AddNetworkString("yava_block")
+    util.AddNetworkString("yava_sphere")
+    util.AddNetworkString("yava_region")
 
     yava._clients = {}
 
@@ -412,7 +414,9 @@ end
 
 -- setBlock crap
 do
-    local function set_block(x,y,z,v)
+    -- TODO quick_and_dirty should block chunk updates,
+    --      bulk functions should flag chunks themselves
+    local function set_block(x,y,z,v,quick_and_dirty)
         local cx = math.floor(x/32)
         local cy = math.floor(y/32)
         local cz = math.floor(z/32)
@@ -439,31 +443,118 @@ do
                 if next_chunk then yava._stale_chunk_set[next_chunk] = true end
             end
 
-            if SERVER then
+            if SERVER and not quick_and_dirty then
                 net.Start("yava_block")
                 net.WriteInt(x,16) 
                 net.WriteInt(y,16)
                 net.WriteInt(z,16)
-                net.WriteInt(v,16)
+                net.WriteUInt(v,16)
                 net.Broadcast() 
+            end
+        end
+    end
+
+    local function set_sphere(x,y,z,r,v)
+        if v then
+            for iz=z-r,z+r do
+                for iy=y-r,y+r do
+                    for ix=x-r,x+r do
+                        if (x-ix)^2 + (y-iy)^2 + (z-iz)^2 <= r*r then
+                            set_block(ix,iy,iz,v,true)
+                        end
+                    end
+                end
+            end
+
+            if SERVER then
+                net.Start("yava_sphere")
+                net.WriteInt(x,16) 
+                net.WriteInt(y,16)
+                net.WriteInt(z,16)
+                net.WriteUInt(r,16)            
+                net.WriteUInt(v,16)
+                net.Broadcast() 
+            end
+        end
+    end
+
+    local function set_region(x1,y1,z1,x2,y2,z2,v)
+        if v then
+            local x_low = math.min(x1,x2)
+            local y_low = math.min(y1,y2)
+            local z_low = math.min(z1,z2)
+
+            local x_high = math.max(x1,x2)
+            local y_high = math.max(y1,y2)
+            local z_high = math.max(z1,z2)
+            
+            for iz=z_low,z_high do
+                for iy=y_low,y_high do
+                    for ix=x_low,x_high do
+                        set_block(ix,iy,iz,v,true)
+                    end
+                end
+            end
+
+            if SERVER then
+                net.Start("yava_region")
+                net.WriteInt(x1,16) 
+                net.WriteInt(y1,16)
+                net.WriteInt(z1,16)
+                net.WriteInt(x2,16)
+                net.WriteInt(y2,16)
+                net.WriteInt(z2,16)
+                net.WriteUInt(v,16)
+                net.Broadcast()
             end
         end
     end
 
     if SERVER then
         yava.setBlock = function(x,y,z,type)
-            --print(x,y,z,type)
             local v = yava._blockTypes[type]
             set_block(x,y,z,v)
         end
+
+        yava.setSphere = function(x,y,z,r,type)
+            local v = yava._blockTypes[type]
+            set_sphere(x,y,z,r,v)
+        end
+
+        yava.setRegion = function(x1,y1,z1,x2,y2,z2,type)
+            local v = yava._blockTypes[type]
+            set_region(x1,y1,z1,x2,y2,z2,v)
+        end
     else
         net.Receive("yava_block", function(bitlen)
-            local x = net.ReadUInt(16)
-            local y = net.ReadUInt(16)
-            local z = net.ReadUInt(16)
+            local x = net.ReadInt(16)
+            local y = net.ReadInt(16)
+            local z = net.ReadInt(16)
             local v = net.ReadUInt(16)
             
             set_block(x,y,z,v)
+        end)
+
+        net.Receive("yava_sphere", function(bitlen)
+            local x = net.ReadInt(16)
+            local y = net.ReadInt(16)
+            local z = net.ReadInt(16)
+            local r = net.ReadUInt(16)
+            local v = net.ReadUInt(16)
+            
+            set_sphere(x,y,z,r,v)
+        end)
+
+        net.Receive("yava_region", function(bitlen)
+            local x1 = net.ReadInt(16)
+            local y1 = net.ReadInt(16)
+            local z1 = net.ReadInt(16)
+            local x2 = net.ReadInt(16)
+            local y2 = net.ReadInt(16)
+            local z2 = net.ReadInt(16)
+            local v = net.ReadUInt(16)
+            
+            set_region(x1,y1,z1,x2,y2,z2,v)
         end)
     end
 end
@@ -471,6 +562,10 @@ end
 function yava.worldPosToBlockCoords(pos)
     local coords = (pos - yava._offset) / yava._scale
     return math.floor(coords.x), math.floor(coords.y), math.floor(coords.z)
+end
+
+function yava.worldDistToBlockCount(n)
+    return math.floor(n / yava._scale)
 end
 
 -- Don't let players screw with our voxels!

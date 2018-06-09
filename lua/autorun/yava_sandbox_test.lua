@@ -74,6 +74,7 @@ yava.init{
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:SetPos(Vector(-9000, -8000, 3000))
     ply:Give("yava_gun")
+    ply:Give("yava_bulk")    
 end)
 
 if SERVER then
@@ -97,4 +98,11 @@ else
 			RunConsoleCommand("yava_brush_mat",value)
         end
     end)
+
+    hook.Add("PostDrawOpaqueRenderables","yava_drawhelpers",function()
+		local w = LocalPlayer():GetActiveWeapon()
+		if IsValid(w) and w.YavaDraw then
+			w:YavaDraw()
+		end
+	end)
 end
