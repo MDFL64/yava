@@ -118,16 +118,14 @@ local nul_table = {}
 --local cl_table = {}
 function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
-    if not chunk then return end
+    if not chunk then return false end
 
     if CLIENT then
         local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
         local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
         local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
         
-        local t = SysTime()
         chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
-        --print("MESHED",#chunk.block_data,SysTime()-t)
     end
     if SERVER then
         local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
@@ -176,6 +174,7 @@ function yava._updateChunks()
     end
 
     yava._stale_chunk_set[chunk] = nil
+    return true
 end
 
 -- maps (name -> id) and (id+1 -> name)
@@ -246,12 +245,16 @@ yava.addBlockType("void",{faceType = yava.FACE_NONE, solid = false})
 include("yava_lib_chunk.lua")
 
 hook.Add("Think","yava_update",function()
-    yava._updateChunks()
-
+    local start = SysTime()
+    
+    for i=1,100 do
+        local t = SysTime()-start
+        if not yava._updateChunks() then break end
+        if t>.005 then break end
+    end
+    
     if SERVER then
-        --for i=1,100 do
         yava._sendChunks()
-        --end
     end
 end)
 
