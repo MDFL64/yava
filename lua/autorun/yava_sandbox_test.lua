@@ -1,9 +1,8 @@
-
---print("YAVA #1")
 if game.GetMap()~="yava_void" or GetConVar("gamemode"):GetString()~="sandbox" then return end
---print("YAVA #2")
 
 AddCSLuaFile()
+
+if SERVER then resource.AddWorkshop("1402515908") end
 
 include("yava.lua")
 

@@ -6,12 +6,14 @@ A3: June ?, 2018
     - Diagnostic commands for textures.
     - Voxel guns are now spawnable.
     - Bulk voxel gun is admin-restricted.
+    - Added automatic workshop dl.
     [Internal]
     - Added clientside physics meshes.
     - Removed unneeded crap from physics meshing.
     - Dialed back chunk collider's clientside think rate.
     - Reduced atlas size for older GPU support.
     - Added warning if GPU does not support hardcoded atlas size.
+    - Attempted to speed up bulk updates by flagging dirty chunks after editing block data.
 
 A2: June 9, 2018
     [Testbed]

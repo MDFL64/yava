@@ -414,8 +414,6 @@ end
 
 -- setBlock crap
 do
-    -- TODO quick_and_dirty should block chunk updates,
-    --      bulk functions should flag chunks themselves
     local function set_block(x,y,z,v,quick_and_dirty)
         local cx = math.floor(x/32)
         local cy = math.floor(y/32)
@@ -428,6 +426,9 @@ do
         
         if chunk and v then
             yava._chunkSetBlock(chunk.block_data,lx,ly,lz,v)
+            
+            if quick_and_dirty then return end -- chunk updates and networking are someone elses problem
+
             yava._stale_chunk_set[chunk] = true
             
             if lx==0 then
@@ -443,13 +444,36 @@ do
                 if next_chunk then yava._stale_chunk_set[next_chunk] = true end
             end
 
-            if SERVER and not quick_and_dirty then
+            if SERVER then
                 net.Start("yava_block")
                 net.WriteInt(x,16) 
                 net.WriteInt(y,16)
                 net.WriteInt(z,16)
                 net.WriteUInt(v,16)
                 net.Broadcast() 
+            end
+        end
+    end
+
+    local function flag_region(x_low,y_low,z_low,x_high,y_high,z_high)
+        local cx1 = math.floor(x_low/32)
+        local cy1 = math.floor(y_low/32)
+        local cz1 = math.floor(z_low/32)
+
+        if x_low%32 == 0 then cx1=cx1-1 end
+        if y_low%32 == 0 then cy1=cy1-1 end
+        if z_low%32 == 0 then cz1=cz1-1 end
+
+        local cx2 = math.floor(x_high/32)
+        local cy2 = math.floor(y_high/32)
+        local cz2 = math.floor(z_high/32)
+
+        for z=cz1,cz2 do
+            for y=cy1,cy2 do
+                for x=cx1,cx2 do
+                    local chunk = yava._chunks[yava._chunkKey(x,y,z)]
+                    if chunk then yava._stale_chunk_set[chunk] = true end
+                end
             end
         end
     end
@@ -465,6 +489,8 @@ do
                     end
                 end
             end
+
+            flag_region(x-r,y-r,z-r,x+r,y+r,z+r)
 
             if SERVER then
                 net.Start("yava_sphere")
@@ -495,6 +521,8 @@ do
                     end
                 end
             end
+
+            flag_region(x_low,y_low,z_low,x_high,y_high,z_high)
 
             if SERVER then
                 net.Start("yava_region")
