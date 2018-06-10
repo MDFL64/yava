@@ -79,7 +79,8 @@ end)
 
 if CLIENT then
     hook.Add("Initialize","yava_setup_ui",function()
-		CreateClientConVar("yava_brush_mat","purple", false, true)
+        CreateClientConVar("yava_brush_mat","purple", false, true)
+		CreateClientConVar("yava_atlas_test","0", false, false)        
 
 		local combo = g_ContextMenu:Add("DComboBox")
 		combo:SetPos(20,130)
@@ -98,17 +99,29 @@ if CLIENT then
     end)
 
     hook.Add("PostDrawOpaqueRenderables","yava_drawhelpers",function()
-		local w = LocalPlayer():GetActiveWeapon()
+        local w = LocalPlayer():GetActiveWeapon()
 		if IsValid(w) and w.YavaDraw then
 			w:YavaDraw()
 		end
 	end)
-end
 
---[[ atlas test!
-hook.Add("HUDPaint", "yava_atlas_test", function() 
-    surface.SetMaterial(yava._atlas) 
-    surface.SetDrawColor( 255, 255, 255, 255 ) 
-    surface.DrawTexturedRect(10,10,16,16384)
-end)
-]]
+    -- diagnostics
+
+    concommand.Add("yava_diag", function()
+        local texture = yava._atlas_screen:GetTexture("$basetexture")
+        local w1,h1 = texture:GetMappingWidth(),texture:GetMappingHeight()
+        local w2,h2 = texture:Width(),texture:Height()
+        print("Atlas size: "..w1.."x"..h1.." / "..w2.."x"..h2)
+    end)
+
+    hook.Add("HUDPaint", "yava_atlas_test", function() 
+        if GetConVar("yava_atlas_test"):GetBool() and yava._atlas then
+            local texture = yava._atlas_screen:GetTexture("$basetexture")
+            local w,h = texture:GetMappingWidth(),texture:GetMappingHeight()
+
+            surface.SetMaterial(yava._atlas_screen)
+            surface.SetDrawColor( 255, 255, 255, 255 ) 
+            surface.DrawTexturedRect(0,0,w,h)
+        end
+    end)
+end

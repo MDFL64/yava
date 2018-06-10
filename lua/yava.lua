@@ -87,6 +87,9 @@ if CLIENT then
 
         yava._atlas = CreateMaterial("__yava_atlas", "VertexLitGeneric")
         yava._atlas:SetTexture("$basetexture",atlas_texture)
+
+        yava._atlas_screen = CreateMaterial("__yava_atlas_screen", "UnlitGeneric")
+        yava._atlas_screen:SetTexture("$basetexture",atlas_texture)
     end
 end
 
