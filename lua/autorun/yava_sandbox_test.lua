@@ -74,7 +74,9 @@ yava.init{
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:SetPos(Vector(-9000, -8000, 3000))
     ply:Give("yava_gun")
-    ply:Give("yava_bulk")    
+    if ply:IsAdmin() then
+        ply:Give("yava_bulk")
+    end
 end)
 
 if CLIENT then

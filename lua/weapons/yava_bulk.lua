@@ -1,6 +1,6 @@
 AddCSLuaFile()
 
-SWEP.PrintName = "BULK VOXEL GUN"
+SWEP.PrintName = "Bulk Voxel Gun"
 
 SWEP.UseHands = true
 SWEP.WorldModel = "models/weapons/w_357.mdl"
@@ -8,6 +8,10 @@ SWEP.ViewModel = "models/weapons/c_357.mdl"
 
 SWEP.Primary.Automatic = true
 SWEP.Secondary.Automatic = true
+
+SWEP.Category = "YAVA"
+SWEP.Spawnable = true
+SWEP.AdminOnly = true
 
 function SWEP:SetupDataTables()
 	self:NetworkVar("Int",0,"BrushSize")
@@ -18,7 +22,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:PrimaryAttack()
-	if IsFirstTimePredicted() then
+	if IsFirstTimePredicted() and yava then
 		if !self.Owner:KeyDown(IN_RELOAD) then self:EmitSound( "ambient/explosions/explode_1.wav" ) end
 
 		if SERVER then
@@ -45,7 +49,7 @@ function SWEP:PrimaryAttack()
 end
 
 function SWEP:SecondaryAttack()
-	if IsFirstTimePredicted() then
+	if IsFirstTimePredicted() and yava then
 		if !self.Owner:KeyDown(IN_RELOAD) then self:EmitSound( "npc/env_headcrabcanister/explosion.wav" ) end
 
 		if SERVER then

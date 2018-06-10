@@ -128,56 +128,49 @@ function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return false end
 
+    local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
+    local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
+    local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
+
+    -- visual mesh
     if CLIENT then
-        local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
-        local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
-        local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
-        
         chunk.mesh = yava._chunkGenMesh(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
     end
-    if SERVER then
-        local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
-        local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
-        local cnz = yava._chunks[yava._chunkKey(chunk.x,chunk.y,chunk.z+1)] or nul_table
 
+    -- physical mesh
+    do
         local soup = yava._chunkGenPhysics_dirtySoup(chunk.block_data,chunk.x,chunk.y,chunk.z,cnx.block_data,cny.block_data,cnz.block_data)
 
+        local collider_ent
         if IsValid(chunk.collider_ent) then
-            -- todo try reusing it instead
-            --print("delete old")
-            chunk.collider_ent:Remove()
-            --print("delete old done")
+            collider_ent = chunk.collider_ent
         end
 
         if soup then
+
             if SERVER then
+                if not collider_ent then
+                    collider_ent = ents.Create("yava_chunk")
+                    collider_ent:SetChunkPos(Vector(chunk.x,chunk.y,chunk.z))
+                    collider_ent:Spawn()
+                    
+                    chunk.collider_ent = collider_ent
+                end
                 
-                local mins = yava._offset + Vector(chunk.x,chunk.y,chunk.z)*yava._scale*32
-                local maxs = mins + Vector(32,32,32)*yava._scale
-
-                local e = ents.Create("yava_chunk")
-                e:Spawn()
-                e:SetupCollisions(soup,mins,maxs)
-
-                chunk.collider_ent = e
+                collider_ent:SetupCollisions(soup)
             else
-                --[[local ed = EffectData()
-                util.Effect("yava_chunk_cl", ed)
-                local e = yava._new_chunk_ent
-
-                do
-                    --e:EnableCustomCollisions(true)
-        
-                    e:PhysicsInit(SOLID_VPHYSICS)
-                    e:SetSolid(SOLID_VPHYSICS)
-                    e:SetMoveType(MOVETYPE_VPHYSICS)
-                
-                    e:PhysicsFromMesh(soup_data)
-                    e:GetPhysicsObject():EnableMotion(false)
-                    --local m = e:GetPhysicsObject():GetMesh()
-                end]]
+                if collider_ent then
+                    collider_ent:SetupCollisions(soup)
+                else
+                    chunk.fresh_collider_soup = soup
+                end
             end
-            --print("~~",e)
+        else
+            if collider_ent then
+                if SERVER then
+                    collider_ent:Remove()
+                end
+            end
         end
     end
 

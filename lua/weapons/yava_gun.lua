@@ -1,6 +1,6 @@
 AddCSLuaFile()
 
-SWEP.PrintName = "VOXEL GUN"
+SWEP.PrintName = "Voxel Gun"
 
 SWEP.UseHands = true
 SWEP.WorldModel = "models/weapons/w_Pistol.mdl"
@@ -9,8 +9,11 @@ SWEP.ViewModel = "models/weapons/c_Pistol.mdl"
 SWEP.Primary.Automatic = true
 SWEP.Secondary.Automatic = true
 
+SWEP.Category = "YAVA"
+SWEP.Spawnable = true
+
 function SWEP:PrimaryAttack()
-	if IsFirstTimePredicted() then
+	if IsFirstTimePredicted() and yava then
 		self:EmitSound( "physics/concrete/concrete_impact_soft1.wav" )
 
 		if SERVER then
@@ -24,7 +27,7 @@ function SWEP:PrimaryAttack()
 end
 
 function SWEP:SecondaryAttack()
-	if IsFirstTimePredicted() then
+	if IsFirstTimePredicted() and yava then
 		self:EmitSound( "physics/concrete/concrete_block_impact_hard1.wav" )
 		
 		if SERVER then

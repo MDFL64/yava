@@ -1,6 +1,14 @@
 AddCSLuaFile()
 
 yava.changes = [[
+A3: June ?, 2018
+    [Testbed]
+    - Diagnostic commands for textures.
+    - Voxel guns are now spawnable.
+    - Bulk voxel gun is admin-restricted.
+    [Internal]
+    - Added clientside physics meshes.
+
 A2: June 9, 2018
     [Testbed]
     - New block types.
