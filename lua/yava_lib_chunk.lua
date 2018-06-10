@@ -251,8 +251,8 @@ if CLIENT then
         local i = 1
         local quad_count = 0
         
-        local tsize = 16/16384
-        local tmult = 32/16384
+        local tsize = 16/8192
+        local tmult = 32/8192
 
         local blockFaceImages = yava._blockFaceImages
         local blockFaceTypes = yava._blockFaceTypes
@@ -478,38 +478,25 @@ do
 
         local blockSolidity = yava._blockSolidity
         
-        local function add_quad(x1,y1,z1,   x2,y2,z2,   x3,y3,z3,   x4,y4,z4,   xn,yn,zn,   t,tspan)
-            t = (t - .75)*tmult
+        local function add_quad(x1,y1,z1,   x2,y2,z2,   x3,y3,z3,   x4,y4,z4)
 
-            mesh_data[i] =      xn
-            mesh_data[i+1] =    yn
-            mesh_data[i+2] =    zn
+            mesh_data[i] =    x1+cx
+            mesh_data[i+1] =    y1+cy
+            mesh_data[i+2] =    z1+cz
 
-            mesh_data[i+3] =    x1+cx
-            mesh_data[i+4] =    y1+cy
-            mesh_data[i+5] =    z1+cz
-            mesh_data[i+6] =    0
-            mesh_data[i+7] =    0
+            mesh_data[i+3] =    x2+cx
+            mesh_data[i+4] =    y2+cy
+            mesh_data[i+5] =   z2+cz
 
-            mesh_data[i+8] =    x2+cx
-            mesh_data[i+9] =    y2+cy
-            mesh_data[i+10] =   z2+cz
-            mesh_data[i+11] =   0
-            mesh_data[i+12] =   0
+            mesh_data[i+6] =   x4+cx
+            mesh_data[i+7] =   y4+cy
+            mesh_data[i+8] =   z4+cz
 
-            mesh_data[i+13] =   x4+cx
-            mesh_data[i+14] =   y4+cy
-            mesh_data[i+15] =   z4+cz
-            mesh_data[i+16] =   0
-            mesh_data[i+17] =   0
+            mesh_data[i+9] =   x3+cx
+            mesh_data[i+10] =   y3+cy
+            mesh_data[i+11] =   z3+cz
 
-            mesh_data[i+18] =   x3+cx
-            mesh_data[i+19] =   y3+cy
-            mesh_data[i+20] =   z3+cz
-            mesh_data[i+21] =   0
-            mesh_data[i+22] =   0
-
-            i = i+23
+            i = i+12
             quad_count = quad_count+1
         end
 
@@ -647,30 +634,25 @@ do
             
             local index = 1
             local soup_index = 1
-            local normal = Vector()
             local positions = {Vector(),Vector(),Vector(),Vector()}
             local scale = yava._scale
             local offset = yava._offset
-            local function add_soup_vert(pos,normal)
+            local function add_soup_vert(pos)
                 if mesh_soup[soup_index] == nil then
-                    mesh_soup[soup_index] = {pos=Vector(),normal=Vector()}
+                    mesh_soup[soup_index] = {pos=Vector()}--,normal=Vector()}
                 end
                 local vert = mesh_soup[soup_index]
                 vert.pos.x = pos.x
                 vert.pos.y = pos.y
                 vert.pos.z = pos.z
 
-                vert.normal.x = normal.x
-                vert.normal.y = normal.y
-                vert.normal.z = normal.z
+                --vert.normal.x = normal.x
+                --vert.normal.y = normal.y
+                --vert.normal.z = normal.z
 
                 soup_index = soup_index+1
             end
             for i=1,quad_count do
-                normal.x = mesh_data[index]
-                normal.y = mesh_data[index+1]
-                normal.z = mesh_data[index+2]
-                index = index+3
                 
                 for j=1,4 do
                     positions[j].x = mesh_data[index]
@@ -678,16 +660,16 @@ do
                     positions[j].z = mesh_data[index+2]
                     positions[j]:Mul( scale )
                     positions[j]:Add( offset )
-                    index = index+5
+                    index = index+3
                 end
 
-                add_soup_vert(positions[1],normal)
-                add_soup_vert(positions[2],normal)
-                add_soup_vert(positions[3],normal)
+                add_soup_vert(positions[1])
+                add_soup_vert(positions[2])
+                add_soup_vert(positions[3])
 
-                add_soup_vert(positions[1],normal)
-                add_soup_vert(positions[3],normal)
-                add_soup_vert(positions[4],normal)
+                add_soup_vert(positions[1])
+                add_soup_vert(positions[3])
+                add_soup_vert(positions[4])
             end
             mesh_soup[soup_index] = nil
 

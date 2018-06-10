@@ -50,20 +50,24 @@ end
 end]]
 
 function ENT:Think()
-    if CLIENT and not self.setup then
-        local chunk_pos = self:GetChunkPos()        
-        local chunk = yava._chunks[yava._chunkKey(chunk_pos.x,chunk_pos.y,chunk_pos.z)]
-        if chunk then
-            chunk.collider_ent = self
-            if chunk.fresh_collider_soup then
-                self:SetupCollisions(chunk.fresh_collider_soup)
-                chunk.fresh_collider_soup = nil
-            end
-            self.setup = true
-        end
-    end
-
     self:SetCollisionBounds(self.correct_mins, self.correct_maxs)
+
+    if CLIENT then
+        if not self.setup then
+            local chunk_pos = self:GetChunkPos()        
+            local chunk = yava._chunks[yava._chunkKey(chunk_pos.x,chunk_pos.y,chunk_pos.z)]
+            if chunk then
+                chunk.collider_ent = self
+                if chunk.fresh_collider_soup then
+                    self:SetupCollisions(chunk.fresh_collider_soup)
+                    chunk.fresh_collider_soup = nil
+                end
+                self.setup = true
+            end
+        end
+        -- do this crap way less often on the client
+        self:SetNextClientThink(CurTime()+1)
+    end
 end
 
 function ENT:Draw()

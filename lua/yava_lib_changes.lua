@@ -8,6 +8,10 @@ A3: June ?, 2018
     - Bulk voxel gun is admin-restricted.
     [Internal]
     - Added clientside physics meshes.
+    - Removed unneeded crap from physics meshing.
+    - Dialed back chunk collider's clientside think rate.
+    - Reduced atlas size for older GPU support.
+    - Added warning if GPU does not support hardcoded atlas size.
 
 A2: June 9, 2018
     [Testbed]
