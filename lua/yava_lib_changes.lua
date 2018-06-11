@@ -7,6 +7,7 @@ A3: June ?, 2018
     - Voxel guns are now spawnable.
     - Bulk voxel gun is admin-restricted.
     - Added automatic workshop dl.
+    - Added advanced voxel gun.
     [Internal]
     - Added clientside physics meshes.
     - Removed unneeded crap from physics meshing.

@@ -75,6 +75,7 @@ hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:Give("yava_gun")
     if ply:IsAdmin() then
         ply:Give("yava_bulk")
+        ply:Give("yava_adv")        
     end
 end)
 
