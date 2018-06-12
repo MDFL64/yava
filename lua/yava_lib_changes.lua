@@ -1,7 +1,7 @@
 AddCSLuaFile()
 
 yava.changes = [[
-A3: June ?, 2018
+A3: June 10, 2018
     [Testbed]
     - Diagnostic commands for textures.
     - Voxel guns are now spawnable.
