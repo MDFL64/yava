@@ -30,9 +30,12 @@ function SWEP:PrimaryAttack()
 
 	if IsFirstTimePredicted() and yava then
 		self:EmitSound( "ambient/machines/teleport1.wav" )
-		local x1,y1,z1 = yava.worldPosToBlockCoords(self:GetP1())
-		local x2,y2,z2 = yava.worldPosToBlockCoords(self:GetP2())
-		yava.setRegion(x1,y1,z1,x2,y2,z2,"void")
+		
+		if SERVER then
+			local x1,y1,z1 = yava.worldPosToBlockCoords(self:GetP1())
+			local x2,y2,z2 = yava.worldPosToBlockCoords(self:GetP2())
+			yava.setRegion(x1,y1,z1,x2,y2,z2,"void")
+		end
 	end
 
 	self:SetNextPrimaryFire(CurTime()+1)
@@ -41,9 +44,12 @@ end
 function SWEP:SecondaryAttack()
 	if IsFirstTimePredicted() and yava then
 		self:EmitSound( "npc/env_headcrabcanister/explosion.wav" )
-		local x1,y1,z1 = yava.worldPosToBlockCoords(self:GetP1())
-		local x2,y2,z2 = yava.worldPosToBlockCoords(self:GetP2())
-		yava.setRegion(x1,y1,z1,x2,y2,z2,self.Owner:GetInfo("yava_brush_mat"))
+
+		if SERVER then
+			local x1,y1,z1 = yava.worldPosToBlockCoords(self:GetP1())
+			local x2,y2,z2 = yava.worldPosToBlockCoords(self:GetP2())
+			yava.setRegion(x1,y1,z1,x2,y2,z2,self.Owner:GetInfo("yava_brush_mat"))
+		end
 	end
 
 	self:SetNextPrimaryFire(CurTime()+1)
