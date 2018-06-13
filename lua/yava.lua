@@ -36,6 +36,7 @@ function yava.init(config)
     setDefault("blockScale", 40)
     setDefault("generator", function() return "void" end)
     setDefault("imageDir", ".")
+    setDefault("skyLight", 3) -- :^)
 
     yava._vmatrix = Matrix()
 
@@ -47,6 +48,11 @@ function yava.init(config)
     yava._generator = config.generator
 
     yava._imageDir = config.imageDir
+
+    yava._light_sky_light = config.skyLight --:^)
+    yava._world_height = 512 --probably wrong xD
+    yava._light_map = {}
+    yava._light_storage_size_in_bits = 4
 
     if CLIENT then
         timer.Simple(0,function()
@@ -325,6 +331,8 @@ else
     util.AddNetworkString("yava_block")
     util.AddNetworkString("yava_sphere")
     util.AddNetworkString("yava_region")
+    util.AddNetworkString("yava_skylight") -- :+)
+
 
     yava._clients = {}
 
@@ -414,7 +422,11 @@ end
 
 -- setBlock crap
 do
-    local function set_block(x,y,z,v,quick_and_dirty)
+    local function get_block(x,y,z)
+        return
+    end
+
+    local function set_block(x,y,z,v,quick_and_dirty,light)
         local cx = math.floor(x/32)
         local cy = math.floor(y/32)
         local cz = math.floor(z/32)
@@ -426,6 +438,39 @@ do
         
         if chunk and v then
             yava._chunkSetBlock(chunk.block_data,lx,ly,lz,v)
+            --TODO: this :^)
+                --yava._chunkGetBlock(chunk_block_data,x,y,z)
+            --this is for existing light sources
+                --if the  bightest light level in the 6 directions is > 1 then
+                    light = light -- + the light of the brightest surrounding block - 1. 
+                --end
+            --this is for the sun
+                --code does not work:
+                    --the code always thinks it is the top block.
+            local top = lz
+            for height = 0, yava._world_height do
+                local beanz = yava._chunkGetBlock(chunk.block_data,lx,ly,lz+height)
+                if beanz > 2048 then
+                    top = lz+height
+                end
+            end
+            --if(the block is the top one) then
+            if(top == lz) then
+                local lightPlusSky = light + yava._light_sky_light
+                print("Surface block placed!")
+            elseif(top > lz) then --otherwise, the block being placed will be undersomething
+                local lightPlusSky = light
+                print("Underground block placed!")
+            else
+                print("I think there was an error in yava.lua...")
+                local lightPlusSky = light
+            end
+
+            --I think this is for placing light blocks
+                --something about replacing blocks with lighter levels
+            
+            --used to test the function when a block is placed.
+            --update_sky(lightPlusSky)
             
             if quick_and_dirty then return end -- chunk updates and networking are someone elses problem
 
@@ -450,7 +495,8 @@ do
                 net.WriteInt(y,16)
                 net.WriteInt(z,16)
                 net.WriteUInt(v,16)
-                net.Broadcast() 
+                net.WriteUInt(lightPlusSky,yava._light_storage_size_in_bits)
+                net.Broadcast()
             end
         end
     end
@@ -541,7 +587,7 @@ do
     if SERVER then
         yava.setBlock = function(x,y,z,type)
             local v = yava._blockTypes[type]
-            set_block(x,y,z,v)
+            set_block(x,y,z,v,null,0) --:^) test
         end
 
         yava.setSphere = function(x,y,z,r,type)
@@ -559,8 +605,10 @@ do
             local y = net.ReadInt(16)
             local z = net.ReadInt(16)
             local v = net.ReadUInt(16)
+            --room for quick_and_dirty? -- :^)
+            local light = net.ReadUInt(4)
             
-            set_block(x,y,z,v)
+            set_block(x,y,z,v,null,light)
         end)
 
         net.Receive("yava_sphere", function(bitlen)
@@ -584,6 +632,33 @@ do
             
             set_region(x1,y1,z1,x2,y2,z2,v)
         end)
+        net.Receive("yava_skylight", function(bitlen)
+            update_sky(net.ReadUInt(yava._light_storage_size_in_bits))
+        end)
+    end
+end
+
+--have all blocks start dark and only light up the ones near lights and on the surface
+
+--moved to top
+--yava._light_map = {}
+--yava._light_storage_size_in_bits = 4
+
+function update_sky(light)
+    print(light .. " is the new Light Level!")
+    if CLIENT then
+        --If this function is called by a client, then update all block's light levels...
+        yava._light_sky_light = light
+        --update all (surface?) blocks
+        
+        --for surface blocks: have a 2d array of blocks for x and z (w/e) and have a height check.
+            --have each chunk have an array?
+            --each block near the light should be updated tooooo aarrghghh
+    else
+        --If this function is called by the server, then update the light level on all clients.
+        net.Start("yava_skylight")
+        net.WriteInt(light, yava._light_storage_size_in_bits)
+        net.Broadcast()
     end
 end
 
