@@ -830,4 +830,4 @@ end
 
 yava._chunkSetBlock = chunk_set_block
 yava._chunkGetBlock = chunk_get_block
-
+yava._chunkGetRow =   chunk_get_row

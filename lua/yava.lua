@@ -4,8 +4,8 @@ yava = {}
 
 do -- CONSTANTS
     yava.FACE_NONE = 0
-    yava.FACE_TRANSPARENT = 1
-    yava.FACE_TRANSPARENT_NOCULL = 2
+    yava.FACE_PARTIAL = 1
+    yava.FACE_PARTIAL_NOCULL = 2
     yava.FACE_OPAQUE = 3
 end
 
@@ -65,9 +65,9 @@ end
 if CLIENT then
 
     function yava._buildAtlas()
-        local pointSample = true
+        local flags = 1 -- other flags (disabling mipmaps) don't seem to even work
         local atlas_texture = GetRenderTargetEx("__yava_atlas",16,8192,
-            RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
+            RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,flags,0,IMAGE_FORMAT_RGBA8888)
 
         render.PushRenderTarget(atlas_texture)
         cam.Start2D()
@@ -81,9 +81,9 @@ if CLIENT then
             local source = Material(imgDir.."/"..name..".png")
 
             surface.SetMaterial(source)
-            surface.DrawTexturedRectUV(0,(i-1)*32,16,8,     0,0,1,0.03125)
-            surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
-            surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,  0,0.96875,1,1)
+            surface.DrawTexturedRectUV(0, (i-1)*32,16,8,     0,0,1,0.03125)
+            surface.DrawTexturedRect(0,   (i-1)*32+8,16,16)
+            surface.DrawTexturedRectUV(0, (i-1)*32+24,16,8,  0,0.96875,1,1)
         end
 
         cam.End2D()
@@ -263,6 +263,11 @@ hook.Add("Think","yava_update",function()
     end
 end)
 
+local mat_wireframe = Material("editor/wireframe")
+
+local CL_CHUNK_BITCOUNT = 0
+local SH_CHUNK_TIME = 0
+
 if CLIENT then
     hook.Add("PostDrawOpaqueRenderables","yava_render",function()
         
@@ -286,13 +291,21 @@ if CLIENT then
                 chunk.mesh:Draw()
             end
         end
+        if LocalPlayer():KeyDown(IN_DUCK) then
+            render.SetMaterial(mat_wireframe)
+            for _,chunk in pairs(yava._chunks) do
+                if chunk.mesh then
+                    chunk.mesh:Draw()
+                end
+            end
+        end
         cam.PopModelMatrix()
 
         render.SuppressEngineLighting(false) 
     end)
 
-    local rx_chunk_count = 0
-    net.Receive("yava_chunk_blocks", function()
+    net.Receive("yava_chunk_blocks", function(len)
+        local t = SysTime()
         local x = net.ReadUInt(16)
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
@@ -316,8 +329,8 @@ if CLIENT then
         net.WriteUInt(z, 16)
         net.SendToServer()
         
-        rx_chunk_count = rx_chunk_count+1
-        --print(rx_chunk_count)
+        CL_CHUNK_BITCOUNT = CL_CHUNK_BITCOUNT+len
+        SH_CHUNK_TIME = SH_CHUNK_TIME + (SysTime()-t)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
@@ -365,6 +378,7 @@ else
                     if chunk == nil then continue end
                     
                     if not v or v<expire_time then
+                        local ttt = SysTime()
                         -- send the chunk
                         net.Start("yava_chunk_blocks",true)
                         net.WriteUInt(chunk.x, 16)
@@ -381,6 +395,8 @@ else
                         
                         client_info.send_count = client_info.send_count - 1
                         n = n+1
+
+                        SH_CHUNK_TIME = SH_CHUNK_TIME + (SysTime()-ttt)
                     end
                 end
                 --print("SENT",n)
@@ -604,3 +620,157 @@ end)
 hook.Add("CanTool", "yava_notool", function(ply,tr,tool)
 	if IsValid(tr.Entity) and tr.Entity:GetClass() == "yava_chunk" then return false end
 end)
+
+if CLIENT then
+    local function get_packed_8(n,i)
+        return bit.band(math.floor(n/256^i),0xFF)
+    end
+
+    concommand.Add("yava_memstat", function()
+        local raw = 0
+        local mem = 0
+        local lz = 0
+        local t = SysTime()
+        for k,chunk in pairs(yava._chunks) do
+            raw = raw+ (32*32*32)*12
+            mem = mem+ (#chunk.block_data)*64
+            local str=""
+            for i=1,#chunk.block_data do
+                local d = chunk.block_data[i]
+                str = str..string.char(
+                    get_packed_8(d,0),
+                    get_packed_8(d,1),
+                    get_packed_8(d,2),
+                    get_packed_8(d,3),
+                    get_packed_8(d,4),
+                    get_packed_8(d,5))
+            end
+            local comp = util.Compress(str)
+            lz = lz+ (#comp)*8
+        end
+
+        print("MEMORY")
+        print("  RAW:  "..raw)
+        print("  MEM:  "..mem)
+        print("  NET:  "..CL_CHUNK_BITCOUNT)
+        print("  LZMA: "..lz)
+        print("TIME")
+        print("  DEC-NET:  "..SH_CHUNK_TIME)
+        print("  ENC-LZMA: "..(SysTime()-t))
+    end)
+else
+    concommand.Add("yava_memstat_sv",function()
+        print("ENC-NET: "..SH_CHUNK_TIME)
+    end)
+
+    local P = {
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    
+    local function ppp_sim(chunk,debug)
+        local bit_count = 0
+        
+        for i=1,64 do
+            P[i] = 0 -- todo place most common symbol here?
+        end
+
+        local function sim_enc(n)
+            if n<128 then
+                return 8
+            elseif n<128*128 then
+                return 2*8
+            else
+                return 3*8
+            end
+        end
+
+        local predicted_count = 0
+        local predicted_str = ""
+        local d = 0
+        for z=0,31 do
+            for y=0,31 do
+                local rx = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+                local ry = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+                local rz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+                yava._chunkGetRow(chunk.block_data,rx,y,z)
+                if y>0 then yava._chunkGetRow(chunk.block_data,ry,y-1,z) end
+                if z>0 then yava._chunkGetRow(chunk.block_data,rz,y,z-1) end
+
+                for x=0,31 do
+                    -- get predictor hash
+                    local px = x>0 and rx[x] or 0
+                    local py = ry[x+1]
+                    local pz = rz[x+1]
+                    local H = bit.band(bit.bxor(px,py*41,pz*541),0x3F)
+                    
+                    -- get actual data
+                    local d = rx[x+1]
+                    
+                    -- check prediction
+                    if P[H+1] == d then
+                        predicted_count=predicted_count+1
+                        if debug then predicted_str=predicted_str..d.."," end
+                    else
+                        P[H+1] = d
+                        if predicted_count>0 then
+                            if debug then print("PREDICT",predicted_count,predicted_str) predicted_str = "" end
+                            bit_count = bit_count+sim_enc(predicted_count)
+                            predicted_count = 0
+                        end
+                        if debug then print("LIT",d) end
+                        bit_count = bit_count+sim_enc(10)
+                    end
+                end
+            end
+        end
+
+        if predicted_count>0 then
+            if debug then print("PREDICT",predicted_count,predicted_str) end
+            bit_count = bit_count+sim_enc(predicted_count)
+        end
+
+        if debug then PrintTable(P) end
+
+        return bit_count
+    end
+
+    concommand.Add("yava_compression_sim",function(ply)
+        local x,y,z = yava.worldPosToBlockCoords(ply:GetPos())
+        x = math.floor(x/32)
+        y = math.floor(y/32)
+        z = math.floor(z/32)
+
+        print(x,y,z)
+        local chunk = yava._chunks[yava._chunkKey(x,y,z)]
+        if chunk then
+            local bits = ppp_sim(chunk,true)
+            print("BITS",bits)
+        end
+    end)
+
+    concommand.Add("yava_compression_sim",function(ply)
+        local x,y,z = yava.worldPosToBlockCoords(ply:GetPos())
+        x = math.floor(x/32)
+        y = math.floor(y/32)
+        z = math.floor(z/32)
+
+        print(x,y,z)
+        local chunk = yava._chunks[yava._chunkKey(x,y,z)]
+        if chunk then
+            local bits = ppp_sim(chunk,true)
+            print("BITS",bits)
+        end
+    end)
+
+    concommand.Add("yava_compression_sim_all",function(ply)
+        local t = SysTime()
+        local bits=0
+        for k,chunk in pairs(yava._chunks) do
+            bits=bits+ppp_sim(chunk)
+        end
+        print(bits,SysTime()-t)
+    end)
+end

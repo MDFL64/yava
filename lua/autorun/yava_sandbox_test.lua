@@ -6,11 +6,16 @@ if SERVER then resource.AddWorkshop("1402515908") end
 
 include("yava.lua")
 
-yava.addBlockType("checkers")
 yava.addBlockType("rock")
+yava.addBlockType("dirt")
+yava.addBlockType("grass",{
+    topImage = "grass_top",
+    bottomImage = "dirt"
+})
 
-yava.addBlockType("face")
+yava.addBlockType("checkers")
 yava.addBlockType("purple")
+
 yava.addBlockType("stripes")
 yava.addBlockType("test",{
     frontImage = "test_front",
@@ -20,11 +25,8 @@ yava.addBlockType("test",{
     topImage = "test_top",
     bottomImage = "test_bottom"
 })
-yava.addBlockType("dirt")
-yava.addBlockType("grass",{
-    topImage = "grass_top",
-    bottomImage = "dirt"
-})
+
+yava.addBlockType("face")
 yava.addBlockType("tree",{
     topImage = "tree_top",
     bottomImage = "tree_top"
@@ -108,13 +110,6 @@ if CLIENT then
 	end)
 
     -- diagnostics
-
-    concommand.Add("yava_diag", function()
-        local texture = yava._atlas_screen:GetTexture("$basetexture")
-        local w1,h1 = texture:GetMappingWidth(),texture:GetMappingHeight()
-        local w2,h2 = texture:Width(),texture:Height()
-        print("Atlas size: "..w1.."x"..h1.." / "..w2.."x"..h2)
-    end)
 
     hook.Add("HUDPaint", "yava_atlas_test", function() 
         if GetConVar("yava_atlas_test"):GetBool() and yava._atlas then
