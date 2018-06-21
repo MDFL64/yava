@@ -1,6 +1,14 @@
 AddCSLuaFile()
 
 yava.changes = [[
+A4: ???
+    [Testbed]
+    - Fixed advanced gun attempting to set voxels clientside.
+    - Switched default block type to rock.
+    [Internal]
+    - Dramatically improved network compression.
+    - Lowered fixed atlas size to 4096. All but a fraction of a percent of GPUs should now be supported.
+
 A3: June 10, 2018
     [Testbed]
     - Diagnostic commands for textures.

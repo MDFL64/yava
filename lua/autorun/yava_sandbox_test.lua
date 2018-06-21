@@ -6,12 +6,18 @@ if SERVER then resource.AddWorkshop("1402515908") end
 
 include("yava.lua")
 
-yava.addBlockType("checkers")
 yava.addBlockType("rock")
+yava.addBlockType("dirt")
+yava.addBlockType("grass",{
+    topImage = "grass_top",
+    bottomImage = "dirt"
+})
 
-yava.addBlockType("face")
+yava.addBlockType("checkers")
 yava.addBlockType("purple")
 yava.addBlockType("stripes")
+
+yava.addBlockType("face")
 yava.addBlockType("test",{
     frontImage = "test_front",
     backImage = "test_back",
@@ -19,11 +25,6 @@ yava.addBlockType("test",{
     rightImage = "test_right",
     topImage = "test_top",
     bottomImage = "test_bottom"
-})
-yava.addBlockType("dirt")
-yava.addBlockType("grass",{
-    topImage = "grass_top",
-    bottomImage = "dirt"
 })
 yava.addBlockType("tree",{
     topImage = "tree_top",
@@ -81,17 +82,17 @@ end)
 
 if CLIENT then
     hook.Add("Initialize","yava_setup_ui",function()
-        CreateClientConVar("yava_brush_mat","purple", false, true)
+        CreateClientConVar("yava_brush_mat","rock", false, true)
 		CreateClientConVar("yava_atlas_test","0", false, false)        
 
-		local combo = g_ContextMenu:Add("DComboBox")
+        local combo = g_ContextMenu:Add("DComboBox")
 		combo:SetPos(20,130)
         combo:SetWide(200)
         
         for i=1,#yava._blockTypes do
             local type = yava._blockTypes[i]
             if type ~= "void" then
-                combo:AddChoice(type,nil,type=="purple")
+                combo:AddChoice(type,nil,type=="rock")
             end
         end
 
@@ -109,12 +110,12 @@ if CLIENT then
 
     -- diagnostics
 
-    concommand.Add("yava_diag", function()
+    --[[concommand.Add("yava_diag", function()
         local texture = yava._atlas_screen:GetTexture("$basetexture")
         local w1,h1 = texture:GetMappingWidth(),texture:GetMappingHeight()
         local w2,h2 = texture:Width(),texture:Height()
         print("Atlas size: "..w1.."x"..h1.." / "..w2.."x"..h2)
-    end)
+    end)]]
 
     hook.Add("HUDPaint", "yava_atlas_test", function() 
         if GetConVar("yava_atlas_test"):GetBool() and yava._atlas then
