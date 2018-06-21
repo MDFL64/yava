@@ -737,7 +737,7 @@ function yava._chunkConsumerConstruct(cx,cy,cz)
 
     local x,y,z = 0,0,0
     local function consumer(type,count)
-        --print("===>",type,count)
+        ----print("===>",type,count)
         while z<32 do
             
             if y==0 and x==0 and count>=1024 then
@@ -778,10 +778,10 @@ end
 
 local function writeVarWidth(n)
     repeat
-        local bits = band(n,0x7F)
-        n = rshift(n,7)
-        if n~=0 then bits=bits+0x80 end
-        net.WriteUInt(bits, 8)
+        local bits = band(n,0xF)
+        n = rshift(n,4)
+        net.WriteUInt(bits, 4)
+        net.WriteBit(n~=0)
     until n==0
 end
 
@@ -789,44 +789,156 @@ local function readVarWidth()
     local n=0
     local s=0
     repeat
-        local bits = net.ReadUInt(8)
-        n = bor(n,lshift(band(bits,0x7F),s))
-        s=s+7
-    until band(bits,0x80)==0
+        local bits = net.ReadUInt(4)
+        n = bor(n,lshift(bits,s))
+        s=s+4
+    until not net.ReadBool()
+    return n
+end
+
+local memo_def = {3,0,1,2}
+local memo = {}
+
+function yava._resetNetMemo()
+    for i=1,#memo_def do
+        memo[i] = memo_def[i]
+    end
+end
+
+yava._resetNetMemo()
+
+--[[local counts = {}
+for i=1,#memo_def do
+    counts[i]=0
+end]]
+
+local function memo_shift(start)
+    for i=start,2,-1 do
+        memo[i] = memo[i-1]
+    end
+end
+
+local function writeMemo(n)
+    if n==memo[2] then
+        net.WriteBit(false) --0
+        
+        memo_shift(2)
+        --counts[2]=counts[2]+1
+    elseif n==memo[3] then
+        net.WriteUInt(1, 2) --10
+        
+        memo_shift(3)
+        --counts[3]=counts[3]+1
+    elseif n==memo[4] then
+        net.WriteUInt(3, 3) --110
+        
+        memo_shift(4)
+        --counts[4]=counts[4]+1
+    else
+        net.WriteUInt(7, 3) --111
+        writeVarWidth(n)
+
+        memo_shift(6)
+        --counts[1]=counts[1]+1
+    end
+    memo[1] = n
+end
+
+--[[if SERVER then
+    concommand.Add("yava_cm",function()
+        PrintTable(counts)
+    end)
+end]]
+
+local function readMemo()
+    local n
+    if net.ReadBool() then -- 1*
+        if net.ReadBool() then --11*
+            if net.ReadBool() then --111 (lit)
+                n = readVarWidth()
+                memo_shift(4)
+            else -- 110 (4)
+                n = memo[4]
+                memo_shift(4)
+            end
+        else -- 10 (3)
+            n = memo[3]
+            memo_shift(3)
+        end
+    else -- 0 (2)
+        n = memo[2]
+        memo_shift(2)
+    end
+
+    memo[1] = n
+
     return n
 end
 
 function yava._chunkConsumerNetwork()
     local function consumer(type,count)
-        type = type*2
-        if count == 1 then
-            writeVarWidth(type)
-        else
-            writeVarWidth(type+1)
-            writeVarWidth(count)
-        end
+        --print(type,count)
+        writeMemo(type)
+        --[[if count == 1 then
+            net.WriteBit(false)
+        else]]
+            --net.WriteBit(true)
+        writeVarWidth(count-1)
+        --end
     end
     local function finalizer()
-        writeVarWidth(0xFFFF)
+        writeMemo(0xFFFF)
     end
     return consumer, finalizer
 end
 
+--local counts = {}
+
 function yava._chunkProvideNetwork(consumer)
     local failsafe = 0
-    while failsafe<1000000 do
-        local type = readVarWidth()
-        --print(string.format("%x",type))
+    while failsafe<33000 do
+        local type = readMemo()
+        ----print(string.format("%x",type))
         if type==0xFFFF then break end
-        if type%2==1 then
-            consumer(rshift(type,1),readVarWidth())
-        else
-            consumer(rshift(type,1),1)
-        end
+        --if net.ReadBool() then
+            --print(type,count)
+
+        local count = readVarWidth()
+        consumer(type,count+1)
+        --counts[count] = (counts[count] or 0) + 1
+
+        --[[else
+            --print(type,1)
+            consumer(type,1)
+            counts[0] = (counts[0] or 0) + 1
+        end]]
         failsafe=failsafe+1
     end
-    if failsafe==1000000 then error("rer") end
+    if failsafe==33000 then error("rer") end
 end
+
+--[[if CLIENT then
+    concommand.Add("yava_cc", function()
+        local pp = {}
+        local sum = 0
+        for i=0,32767 do
+            sum = sum+(counts[i] or 0)
+        end
+        for i=0,32767 do
+            if counts[i] then                
+                local bc = 0
+                local b = i
+                while b~=0 do
+                    b = bit.rshift(b, 1)
+                    bc = bc + 1
+                end
+                pp[bc] = (pp[bc] or 0) + counts[i]
+                print(i,counts[i],string.format("%.1f",math.log(counts[i]/sum,2)))
+            end
+        end
+        PrintTable(pp)
+    end)
+end]]
 
 yava._chunkSetBlock = chunk_set_block
 yava._chunkGetBlock = chunk_get_block

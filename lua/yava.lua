@@ -263,6 +263,8 @@ hook.Add("Think","yava_update",function()
     end
 end)
 
+local chunk_bits = 0
+local chunk_time = 0
 if CLIENT then
     hook.Add("PostDrawOpaqueRenderables","yava_render",function()
         
@@ -292,11 +294,14 @@ if CLIENT then
     end)
 
     local rx_chunk_count = 0
-    net.Receive("yava_chunk_blocks", function()
+    net.Receive("yava_chunk_blocks", function(bits)
+        local t = SysTime()
+        
         local x = net.ReadUInt(16)
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
 
+        yava._resetNetMemo()
         local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
         yava._chunkProvideNetwork(consumer)
 
@@ -316,8 +321,9 @@ if CLIENT then
         net.WriteUInt(z, 16)
         net.SendToServer()
         
-        rx_chunk_count = rx_chunk_count+1
-        --print(rx_chunk_count)
+        chunk_bits = chunk_bits + bits
+        chunk_time = chunk_time + (SysTime()-t)
+        --print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
@@ -366,11 +372,13 @@ else
                     
                     if not v or v<expire_time then
                         -- send the chunk
+                        local t = SysTime()
                         net.Start("yava_chunk_blocks",true)
                         net.WriteUInt(chunk.x, 16)
                         net.WriteUInt(chunk.y, 16)
                         net.WriteUInt(chunk.z, 16)
                         
+                        yava._resetNetMemo()
                         local consumer, finalize = yava._chunkConsumerNetwork()
                         yava._chunkProvideChunk(chunk,consumer)
                         finalize()
@@ -381,7 +389,12 @@ else
                         
                         client_info.send_count = client_info.send_count - 1
                         n = n+1
+
+                        chunk_time = chunk_time + (SysTime()-t)
+                        print(chunk_time)
                     end
+
+                    --if send1 then return end
                 end
                 --print("SENT",n)
             end
