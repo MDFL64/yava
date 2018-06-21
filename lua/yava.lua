@@ -325,7 +325,7 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        --print(chunk_bits,chunk_time)
+        print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
@@ -351,6 +351,11 @@ else
         end
     end
 
+    local DO_SEND = false
+    concommand.Add("yava_send1", function()
+        DO_SEND = true
+    end)
+
     function yava._sendChunks()
 
         local removed_clients = {}
@@ -374,28 +379,31 @@ else
                     
                     if not v or v<expire_time then
                         -- send the chunk
-                        local t = SysTime()
-                        net.Start("yava_chunk_blocks",true)
-                        net.WriteUInt(chunk.x, 16)
-                        net.WriteUInt(chunk.y, 16)
-                        net.WriteUInt(chunk.z, 16)
-                        
-                        -- new meme
-                        yava._chunkNetworkPP3D_send(chunk.block_data)
-                        --yava._resetNetMemo()
-                        --local consumer, finalize = yava._chunkConsumerNetwork()
-                        --yava._chunkProvideChunk(chunk,consumer)
-                        --finalize()
-                        
-                        net.Send(client,true)
-                        
-                        client_info.chunks[chunk] = CurTime()
-                        
-                        client_info.send_count = client_info.send_count - 1
-                        n = n+1
+                        if true or DO_SEND then
+                            DO_SEND = false
+                            local t = SysTime()
+                            net.Start("yava_chunk_blocks",true)
+                            net.WriteUInt(chunk.x, 16)
+                            net.WriteUInt(chunk.y, 16)
+                            net.WriteUInt(chunk.z, 16)
+                            
+                            -- new meme
+                            yava._chunkNetworkPP3D_send(chunk.block_data)
+                            --yava._resetNetMemo()
+                            --local consumer, finalize = yava._chunkConsumerNetwork()
+                            --yava._chunkProvideChunk(chunk,consumer)
+                            --finalize()
+                            
+                            net.Send(client,true)
+                            
+                            client_info.chunks[chunk] = CurTime()
+                            
+                            client_info.send_count = client_info.send_count - 1
+                            n = n+1
 
-                        chunk_time = chunk_time + (SysTime()-t)
-                        print(chunk_time)
+                            chunk_time = chunk_time + (SysTime()-t)
+                        end
+                        --print(chunk_time)
                     end
 
                     --if send1 then return end
