@@ -740,14 +740,14 @@ function yava._chunkConsumerConstruct(cx,cy,cz)
             
             if y==0 and x==0 and count>=1024 then
                 -- add whole slice
-                chunk_set_slice(block_data,z,type)
+                if type ~= 0 then chunk_set_slice(block_data,z,type) end
                 
                 count = count-1024
             else
                 while y<32 do
                     if x==0 and count>=32 then
                         -- add whole row
-                        chunk_set_row(block_data,y,z,type)
+                        if type ~= 0 then chunk_set_row(block_data,y,z,type) end
     
                         count = count-32
                     else
@@ -755,7 +755,7 @@ function yava._chunkConsumerConstruct(cx,cy,cz)
                         while x<32 do
                             if count==0 then return end
     
-                            chunk_set_block(block_data,x,y,z,type)
+                            if type ~= 0 then chunk_set_block(block_data,x,y,z,type) end
     
                             count=count-1
                             x=x+1
@@ -941,13 +941,17 @@ function yava._chunkNetworkPP3D_send(chunk)
     for z=0,31 do
         for y=0,31 do
 
-            chunk_get_row(chunk.block_data,row,y,z)
             if y>0 then
-                chunk_get_row(chunk.block_data,row_py,y-1,z)
+                --chunk_get_row(chunk.block_data,row_py,y-1,z)
+                local tmp = row
+                row = row_py
+                row_py = tmp
             else
                 for i=1,32 do row_py[i]=0 end
             end
 
+            chunk_get_row(chunk.block_data,row,y,z)
+            
             if z>0 then
                 chunk_get_row(chunk.block_data,row_pz,y,z-1)
             else

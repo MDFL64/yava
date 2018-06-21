@@ -319,7 +319,7 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        print(chunk_bits,chunk_time)
+        --print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
@@ -394,7 +394,7 @@ else
 
                             chunk_time = chunk_time + (SysTime()-t)
                         end
-                        --print(chunk_time)
+                        print(chunk_time)
                     end
 
                     --if send1 then return end

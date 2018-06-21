@@ -8,6 +8,7 @@ A4: ???
     [Internal]
     - Dramatically improved network compression.
     - Lowered fixed atlas size to 4096. All but a fraction of a percent of GPUs should now be supported.
+    - Stopped chunk builder from explicitly writing the default block type.
 
 A3: June 10, 2018
     [Testbed]
