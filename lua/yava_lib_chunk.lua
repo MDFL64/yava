@@ -776,9 +776,9 @@ end
 
 local function writeVarWidth(n)
     repeat
-        local bits = band(n,0xF)
-        n = rshift(n,4)
-        net.WriteUInt(bits, 4)
+        local bits = band(n,0x7)
+        n = rshift(n,3)
+        net.WriteUInt(bits,3)
         net.WriteBit(n~=0)
     until n==0
 end
@@ -787,9 +787,9 @@ local function readVarWidth()
     local n=0
     local s=0
     repeat
-        local bits = net.ReadUInt(4)
+        local bits = net.ReadUInt(3)
         n = bor(n,lshift(bits,s))
-        s=s+4
+        s=s+3
     until not net.ReadBool()
     return n
 end
@@ -971,7 +971,7 @@ function yava._chunkNetworkPP3D_send(chunk)
                     local not_P1
                     if predicted_count>0 then
                         not_P1 = true
-                        net.WriteUInt(1,2) -- 10 (P1)
+                        net.WriteBit(false) -- 0 (P1)
                         writeVarWidth(predicted_count-1)
                         --print("P1",predicted_count)
                         predicted_count = 0
@@ -983,14 +983,18 @@ function yava._chunkNetworkPP3D_send(chunk)
                         P[H+2] = P[H+1] 
                         P[H+1] = d
                         --print("P2",x,y,z)
-                        net.WriteBit(false) -- 0 (P2)
+                        if not_P1 then
+                            net.WriteBit(false)-- _0
+                        else
+                            net.WriteUInt(1,2) -- 10 (P2)
+                        end
                     elseif P[H+3] == d then
                         P[H+3] = P[H+2]
                         P[H+2] = P[H+1] 
                         P[H+1] = d
                         --print("P3")
                         if not_P1 then
-                            net.WriteUInt(3,3) --_110
+                            net.WriteUInt(3,3) -- _110
                         else
                             net.WriteUInt(7,4) -- 1110 (P3)
                         end
@@ -1024,30 +1028,16 @@ function yava._chunkNetworkPP3D_send(chunk)
     end
 
     if predicted_count>0 then
-        net.WriteUInt(1,2) -- 10 (P1)
+        net.WriteBit(false) -- 0 (P1)
         writeVarWidth(predicted_count-1)
         --print("P1",predicted_count)
     end
 end
 
-local counts = {
-    START={P1=0,P2=0,P3=0,P4=0,LIT=0},
-    P1={P1=0,P2=0,P3=0,P4=0,LIT=0},
-    P2={P1=0,P2=0,P3=0,P4=0,LIT=0},
-    P3={P1=0,P2=0,P3=0,P4=0,LIT=0},
-    P4={P1=0,P2=0,P3=0,P4=0,LIT=0},
-    LIT={P1=0,P2=0,P3=0,P4=0,LIT=0}
-}
-
-local state
-local function do_transition(ns)
-    counts[state][ns]=counts[state][ns]+1
-    state=ns
-end
+local counts = {}
 
 function yava._chunkNetworkPP3D_recv()
-    state = "START"
-    
+
     local block_data = {0,0,0,0,0,0,0,0}
 
     local cx = readVarWidth()
@@ -1091,9 +1081,9 @@ function yava._chunkNetworkPP3D_recv()
                     d = P[H+1]
                     predicted_count = predicted_count-1
                 else
-                    if net.ReadBool() then -- 1*
-                        if not_P1 or net.ReadBool() then --11*
-                            not_P1 = false
+                    if not_P1 or net.ReadBool() then -- 1*
+                        not_P1 = false
+                        if net.ReadBool() then --11*
                             if net.ReadBool() then --111*
                                 if net.ReadBool() then --1111 (P4)
                                     d = P[H+4]
@@ -1101,13 +1091,11 @@ function yava._chunkNetworkPP3D_recv()
                                     P[H+3] = P[H+2]
                                     P[H+2] = P[H+1]
                                     P[H+1] = d
-                                    do_transition("P4")
                                 else -- 1110 (P3)
                                     d = P[H+3]
                                     P[H+3] = P[H+2]
                                     P[H+2] = P[H+1]
                                     P[H+1] = d
-                                    do_transition("P3")
                                 end
                             else -- 110 (LIT)
                                 d = readVarWidth()
@@ -1115,21 +1103,18 @@ function yava._chunkNetworkPP3D_recv()
                                 P[H+3] = P[H+2]
                                 P[H+2] = P[H+1]
                                 P[H+1] = d
-                                do_transition("LIT")
                             end
-                        else -- 10 (P1)
-                            not_P1 = true
-                            predicted_count = readVarWidth()+1
-                            d = P[H+1]
-                            predicted_count = predicted_count-1
-                            do_transition("P1")
+                        else -- 10 (P2)
+                            d = P[H+2]
+                            P[H+2] = P[H+1]
+                            P[H+1] = d
                         end
-                    else -- 0 (P2)
-                        not_P1 = false --------------------------------------
-                        d = P[H+2]
-                        P[H+2] = P[H+1]
-                        P[H+1] = d
-                        do_transition("P2")
+                    else -- 0 (P1)
+                        not_P1 = true
+                        predicted_count = readVarWidth()+1
+                        counts[predicted_count-1] = (counts[predicted_count-1] or 0)+1
+                        d = P[H+1]
+                        predicted_count = predicted_count-1
                     end
                 end
 
@@ -1148,8 +1133,8 @@ end
 
 if CLIENT then
     concommand.Add("yava_cc", function()
-        PrintTable(counts)
-        --[[local pp = {}
+        --PrintTable(counts)
+        local pp = {}
         local sum = 0
         for i=0,32767 do
             sum = sum+(counts[i] or 0)
@@ -1163,10 +1148,10 @@ if CLIENT then
                     bc = bc + 1
                 end
                 pp[bc] = (pp[bc] or 0) + counts[i]
-                --print(i,counts[i],string.format("%.1f",math.log(counts[i]/sum,2)))
+                print(i,counts[i],string.format("%.1f",-math.log(counts[i]/sum,2)))
             end
         end
-        PrintTable(pp)]]
+        PrintTable(pp)
     end)
 end
 
