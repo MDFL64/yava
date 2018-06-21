@@ -731,9 +731,7 @@ function yava._chunkProvideGenerate(cx,cy,cz,consumer)
 end
 
 function yava._chunkConsumerConstruct(cx,cy,cz)
-    local base_block = "void"
-    local base_data = rep_packed_12(yava._blockTypes[base_block])
-    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
+    local block_data = {0,0,0,0,0,0,0,0}
 
     local x,y,z = 0,0,0
     local function consumer(type,count)
@@ -930,24 +928,28 @@ local row =    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local row_py = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local row_pz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
-function yava._chunkNetworkPP3D_send(block_data)
+function yava._chunkNetworkPP3D_send(chunk)
     for i=1,256 do
         P[i] = (i-1)%4
     end
+
+    writeVarWidth(chunk.x)
+    writeVarWidth(chunk.y)
+    writeVarWidth(chunk.z)    
 
     local predicted_count = 0
     for z=0,31 do
         for y=0,31 do
 
-            chunk_get_row(block_data,row,y,z)
+            chunk_get_row(chunk.block_data,row,y,z)
             if y>0 then
-                chunk_get_row(block_data,row_py,y-1,z)
+                chunk_get_row(chunk.block_data,row_py,y-1,z)
             else
                 for i=1,32 do row_py[i]=0 end
             end
 
             if z>0 then
-                chunk_get_row(block_data,row_pz,y,z-1)
+                chunk_get_row(chunk.block_data,row_pz,y,z-1)
             else
                 for i=1,32 do row_pz[i]=0 end
             end
@@ -966,11 +968,15 @@ function yava._chunkNetworkPP3D_send(block_data)
                 if P[H+1] == d then
                     predicted_count=predicted_count+1
                 else
+                    local not_P1
                     if predicted_count>0 then
+                        not_P1 = true
                         net.WriteUInt(1,2) -- 10 (P1)
                         writeVarWidth(predicted_count-1)
                         --print("P1",predicted_count)
                         predicted_count = 0
+                    else
+                        not_P1 = false
                     end
                     
                     if P[H+2] == d then
@@ -983,21 +989,33 @@ function yava._chunkNetworkPP3D_send(block_data)
                         P[H+2] = P[H+1] 
                         P[H+1] = d
                         --print("P3")
-                        net.WriteUInt(7,4) -- 1110 (P3)
+                        if not_P1 then
+                            net.WriteUInt(3,3) --_110
+                        else
+                            net.WriteUInt(7,4) -- 1110 (P3)
+                        end
                     elseif P[H+4] == d then
                         P[H+4] = P[H+3]
                         P[H+3] = P[H+2]
                         P[H+2] = P[H+1]
                         P[H+1] = d
                         --print("P4")
-                        net.WriteUInt(15,4) -- 1111 (P4)
+                        if not_P1 then
+                            net.WriteUInt(7,3) --  _111
+                        else
+                            net.WriteUInt(15,4) -- 1111 (P4)
+                        end
                     else
                         P[H+4] = P[H+3]
                         P[H+3] = P[H+2]
                         P[H+2] = P[H+1]
                         P[H+1] = d
                         --print("LIT",d)
-                        net.WriteUInt(3,3) -- 110 (lit)
+                        if not_P1 then
+                            net.WriteUInt(1,2) -- _10
+                        else
+                            net.WriteUInt(3,3) -- 110 (lit)
+                        end
                         writeVarWidth(d)
                     end
                 end
@@ -1012,18 +1030,36 @@ function yava._chunkNetworkPP3D_send(block_data)
     end
 end
 
-local counts = {P1=0,P2=0,P3=0,P4=0,LIT=0}
-function yava._chunkNetworkPP3D_recv(cx,cy,cz)
-    local base_block = "void"
-    local base_data = rep_packed_12(yava._blockTypes[base_block])
-    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
+local counts = {
+    START={P1=0,P2=0,P3=0,P4=0,LIT=0},
+    P1={P1=0,P2=0,P3=0,P4=0,LIT=0},
+    P2={P1=0,P2=0,P3=0,P4=0,LIT=0},
+    P3={P1=0,P2=0,P3=0,P4=0,LIT=0},
+    P4={P1=0,P2=0,P3=0,P4=0,LIT=0},
+    LIT={P1=0,P2=0,P3=0,P4=0,LIT=0}
+}
 
-    ---------------------------------------------
+local state
+local function do_transition(ns)
+    counts[state][ns]=counts[state][ns]+1
+    state=ns
+end
+
+function yava._chunkNetworkPP3D_recv()
+    state = "START"
+    
+    local block_data = {0,0,0,0,0,0,0,0}
+
+    local cx = readVarWidth()
+    local cy = readVarWidth()
+    local cz = readVarWidth()
+
     for i=1,256 do
         P[i] = (i-1)%4
     end
 
     local predicted_count = 0
+    local not_P1 = false
     for z=0,31 do
         for y=0,31 do
 
@@ -1056,7 +1092,8 @@ function yava._chunkNetworkPP3D_recv(cx,cy,cz)
                     predicted_count = predicted_count-1
                 else
                     if net.ReadBool() then -- 1*
-                        if net.ReadBool() then --11*
+                        if not_P1 or net.ReadBool() then --11*
+                            not_P1 = false
                             if net.ReadBool() then --111*
                                 if net.ReadBool() then --1111 (P4)
                                     d = P[H+4]
@@ -1064,13 +1101,13 @@ function yava._chunkNetworkPP3D_recv(cx,cy,cz)
                                     P[H+3] = P[H+2]
                                     P[H+2] = P[H+1]
                                     P[H+1] = d
-                                    counts.P4 = counts.P4+1
+                                    do_transition("P4")
                                 else -- 1110 (P3)
                                     d = P[H+3]
                                     P[H+3] = P[H+2]
                                     P[H+2] = P[H+1]
                                     P[H+1] = d
-                                    counts.P3 = counts.P3+1
+                                    do_transition("P3")
                                 end
                             else -- 110 (LIT)
                                 d = readVarWidth()
@@ -1078,19 +1115,21 @@ function yava._chunkNetworkPP3D_recv(cx,cy,cz)
                                 P[H+3] = P[H+2]
                                 P[H+2] = P[H+1]
                                 P[H+1] = d
-                                counts.LIT = counts.LIT+1
+                                do_transition("LIT")
                             end
                         else -- 10 (P1)
+                            not_P1 = true
                             predicted_count = readVarWidth()+1
                             d = P[H+1]
                             predicted_count = predicted_count-1
-                            counts.P1 = counts.P1+1
+                            do_transition("P1")
                         end
                     else -- 0 (P2)
+                        not_P1 = false --------------------------------------
                         d = P[H+2]
                         P[H+2] = P[H+1]
                         P[H+1] = d
-                        counts.P2 = counts.P2+1
+                        do_transition("P2")
                     end
                 end
 
@@ -1103,7 +1142,6 @@ function yava._chunkNetworkPP3D_recv(cx,cy,cz)
             end
         end
     end
-    -----------------------------------
 
     return {x=cx,y=cy,z=cz,block_data=block_data}
 end

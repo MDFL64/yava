@@ -296,17 +296,11 @@ if CLIENT then
     local rx_chunk_count = 0
     net.Receive("yava_chunk_blocks", function(bits)
         local t = SysTime()
-        
-        local x = net.ReadUInt(16)
-        local y = net.ReadUInt(16)
-        local z = net.ReadUInt(16)
 
-        --[[yava._resetNetMemo()
-        local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
-        yava._chunkProvideNetwork(consumer)
-        ]]
-
-        local chunk = yava._chunkNetworkPP3D_recv(x,y,z)
+        local chunk = yava._chunkNetworkPP3D_recv()
+        local x = chunk.x
+        local y = chunk.y
+        local z = chunk.z
         yava._chunks[yava._chunkKey(x,y,z)] = chunk
         yava._stale_chunk_set[chunk] = true
 
@@ -383,12 +377,9 @@ else
                             DO_SEND = false
                             local t = SysTime()
                             net.Start("yava_chunk_blocks",true)
-                            net.WriteUInt(chunk.x, 16)
-                            net.WriteUInt(chunk.y, 16)
-                            net.WriteUInt(chunk.z, 16)
                             
                             -- new meme
-                            yava._chunkNetworkPP3D_send(chunk.block_data)
+                            yava._chunkNetworkPP3D_send(chunk)
                             --yava._resetNetMemo()
                             --local consumer, finalize = yava._chunkConsumerNetwork()
                             --yava._chunkProvideChunk(chunk,consumer)
