@@ -959,7 +959,7 @@ function yava._chunkNetworkPP3D_send(chunk)
                 local px = x>0 and row[x] or 0
                 local py = row_py[x+1]
                 local pz = row_pz[x+1]
-                local H = bit.band(bit.bxor(px,py*104743,pz*105613),0x3F)*4
+                local H = bit.band(bit.bxor(px,py*7,pz*13),0x3F)*4
                 
                 -- get actual data
                 local d = row[x+1]
@@ -1074,7 +1074,7 @@ function yava._chunkNetworkPP3D_recv()
                 local px = x>0 and row[x] or 0
                 local py = row_py[x+1]
                 local pz = row_pz[x+1]
-                local H = bit.band(bit.bxor(px,py*104743,pz*105613),0x3F)*4
+                local H = bit.band(bit.bxor(px,py*7,pz*13),0x3F)*4
                 
                 local d
                 if predicted_count>0 then
