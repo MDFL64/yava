@@ -663,26 +663,29 @@ else
         print("ENC-NET: "..SH_CHUNK_TIME)
     end)
 
-    local P = {
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    local P = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
     
+    local rx = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    local ry = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    local rz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
     local function ppp_sim(chunk,debug)
         local bit_count = 0
         
         for i=1,64 do
-            P[i] = 0 -- todo place most common symbol here?
+            P[i] = -1
         end
 
         local function sim_enc(n)
-            if n<128 then
-                return 8
-            elseif n<128*128 then
-                return 2*8
+            if n<16 then
+                return 5
+            elseif n<16*16 then
+                return 2*5
+            elseif n<16*16*16 then
+                return 3*5
             else
-                return 3*8
+                return 4*5
             end
         end
 
@@ -691,20 +694,26 @@ else
         local d = 0
         for z=0,31 do
             for y=0,31 do
-                local rx = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-                local ry = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-                local rz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
                 yava._chunkGetRow(chunk.block_data,rx,y,z)
-                if y>0 then yava._chunkGetRow(chunk.block_data,ry,y-1,z) end
-                if z>0 then yava._chunkGetRow(chunk.block_data,rz,y,z-1) end
+                if y>0 then
+                    yava._chunkGetRow(chunk.block_data,ry,y-1,z)
+                else
+                    for i=1,32 do ry[i]=0 end
+                end
+
+                if z>0 then
+                    yava._chunkGetRow(chunk.block_data,rz,y,z-1)
+                else
+                    for i=1,32 do rz[i]=0 end
+                end
 
                 for x=0,31 do
                     -- get predictor hash
                     local px = x>0 and rx[x] or 0
                     local py = ry[x+1]
                     local pz = rz[x+1]
-                    local H = bit.band(bit.bxor(px,py*41,pz*541),0x3F)
+                    local H = bit.band(bit.bxor(px,py*104743,pz*105613),0x3F) -- px,py*41,pz*541
                     
                     -- get actual data
                     local d = rx[x+1]
@@ -717,11 +726,11 @@ else
                         P[H+1] = d
                         if predicted_count>0 then
                             if debug then print("PREDICT",predicted_count,predicted_str) predicted_str = "" end
-                            bit_count = bit_count+sim_enc(predicted_count)
+                            bit_count = bit_count+1+sim_enc(predicted_count)
                             predicted_count = 0
                         end
                         if debug then print("LIT",d) end
-                        bit_count = bit_count+sim_enc(10)
+                        bit_count = bit_count+1+sim_enc(5)
                     end
                 end
             end
