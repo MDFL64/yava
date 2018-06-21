@@ -301,10 +301,12 @@ if CLIENT then
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
 
-        yava._resetNetMemo()
+        --[[yava._resetNetMemo()
         local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
         yava._chunkProvideNetwork(consumer)
+        ]]
 
+        local chunk = yava._chunkNetworkPP3D_recv(x,y,z)
         yava._chunks[yava._chunkKey(x,y,z)] = chunk
         yava._stale_chunk_set[chunk] = true
 
@@ -378,10 +380,12 @@ else
                         net.WriteUInt(chunk.y, 16)
                         net.WriteUInt(chunk.z, 16)
                         
-                        yava._resetNetMemo()
-                        local consumer, finalize = yava._chunkConsumerNetwork()
-                        yava._chunkProvideChunk(chunk,consumer)
-                        finalize()
+                        -- new meme
+                        yava._chunkNetworkPP3D_send(chunk.block_data)
+                        --yava._resetNetMemo()
+                        --local consumer, finalize = yava._chunkConsumerNetwork()
+                        --yava._chunkProvideChunk(chunk,consumer)
+                        --finalize()
                         
                         net.Send(client,true)
                         

@@ -917,6 +917,142 @@ function yava._chunkProvideNetwork(consumer)
     if failsafe==33000 then error("rer") end
 end
 
+local P = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+local row =    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+local row_py = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+local row_pz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+function yava._chunkNetworkPP3D_send(block_data)
+    for i=1,254 do
+        P[i] = -1
+    end
+
+    local predicted_count = 0
+    for z=0,31 do
+        for y=0,31 do
+
+            chunk_get_row(block_data,row,y,z)
+            if y>0 then
+                chunk_get_row(block_data,row_py,y-1,z)
+            else
+                for i=1,32 do row_py[i]=0 end
+            end
+
+            if z>0 then
+                chunk_get_row(block_data,row_pz,y,z-1)
+            else
+                for i=1,32 do row_pz[i]=0 end
+            end
+
+            for x=0,31 do
+                -- get predictor hash
+                local px = x>0 and row[x] or 0
+                local py = row_py[x+1]
+                local pz = row_pz[x+1]
+                local H = bit.band(bit.bxor(px,py*104743,pz*105613),0x3F)*4
+                
+                -- get actual data
+                local d = row[x+1]
+                
+                -- check prediction
+                if P[H+1] == d then
+                    predicted_count=predicted_count+1
+                else
+                    P[H+1] = d
+                    if predicted_count>0 then
+                        -- write predicted
+                        net.WriteBit(true)
+                        writeVarWidth(predicted_count)
+                        predicted_count = 0
+                    end
+                    -- write lit
+                    net.WriteBit(false)
+                    writeVarWidth(d)
+                end
+            end
+        end
+    end
+
+    if predicted_count>0 then
+        net.WriteBit(true)
+        writeVarWidth(predicted_count)
+    end
+end
+
+function yava._chunkNetworkPP3D_recv(cx,cy,cz)
+    local base_block = "void"
+    local base_data = rep_packed_12(yava._blockTypes[base_block])
+    local block_data = {base_data,base_data,base_data,base_data,base_data,base_data,base_data,base_data}
+
+    ---------------------------------------------
+    for i=1,256 do
+        P[i] = -1
+    end
+
+    local predicted_count = 0
+    for z=0,31 do
+        for y=0,31 do
+
+            for i=1,32 do
+                row[i]=0
+            end
+
+            if y>0 then
+                chunk_get_row(block_data,row_py,y-1,z)
+            else
+                for i=1,32 do row_py[i]=0 end
+            end
+
+            if z>0 then
+                chunk_get_row(block_data,row_pz,y,z-1)
+            else
+                for i=1,32 do row_pz[i]=0 end
+            end
+
+            for x=0,31 do
+                -- get predictor hash
+                local px = x>0 and row[x] or 0
+                local py = row_py[x+1]
+                local pz = row_pz[x+1]
+                local H = bit.band(bit.bxor(px,py*104743,pz*105613),0x3F)*4
+                
+                -- check if we should start predicting
+                if predicted_count==0 then
+                    if net.ReadBool() then
+                        predicted_count = readVarWidth()
+                    end
+                end
+
+                -- get data
+                local d
+                if predicted_count>0 then
+                    d = P[H+1]
+                    predicted_count = predicted_count-1
+                else
+                    d = readVarWidth()
+                    P[H+1] = d
+                end
+
+                -- write back to cached row
+                row[x+1] = d
+
+                chunk_set_block(block_data,x,y,z,d)
+            end
+        end
+    end
+    -----------------------------------
+
+    return {x=cx,y=cy,z=cz,block_data=block_data}
+end
+
 --[[if CLIENT then
     concommand.Add("yava_cc", function()
         local pp = {}
