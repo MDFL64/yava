@@ -251,8 +251,8 @@ if CLIENT then
         local i = 1
         local quad_count = 0
         
-        local tsize = 16/8192
-        local tmult = 32/8192
+        local tsize = 16/4096
+        local tmult = 32/4096
 
         local blockFaceImages = yava._blockFaceImages
         local blockFaceTypes = yava._blockFaceTypes

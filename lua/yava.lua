@@ -18,7 +18,7 @@ if SERVER then
     end
     --print("deleted")
 else
-    if render.MaxTextureHeight()<8192 then
+    if render.MaxTextureHeight()<4096 then
         ErrorNoHalt("YAVA: Your GPU does not support large enough textures for the atlas: "..render.MaxTextureHeight().."\n")
     end
 end
@@ -66,7 +66,7 @@ if CLIENT then
 
     function yava._buildAtlas()
         local pointSample = true
-        local atlas_texture = GetRenderTargetEx("__yava_atlas",16,8192,
+        local atlas_texture = GetRenderTargetEx("__yava_atlas",16,4096,
             RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
 
         render.PushRenderTarget(atlas_texture)
