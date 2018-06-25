@@ -9,6 +9,7 @@ A4: ???
     - Dramatically improved network compression.
     - Lowered fixed atlas size to 4096. All but a fraction of a percent of GPUs should now be supported.
     - Stopped chunk builder from explicitly writing the default block type.
+    - The server will now mesh up to 1000 chunks per frame. This should prevent the player falling out of the map.
 
 A3: June 10, 2018
     [Testbed]

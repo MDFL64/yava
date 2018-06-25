@@ -131,6 +131,9 @@ local nul_table = {}
 function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return false end
+    
+    -- do this early so we can recover from chunks that fail to mesh right
+    yava._stale_chunk_set[chunk] = nil
 
     local cnx = yava._chunks[yava._chunkKey(chunk.x+1,chunk.y,chunk.z)] or nul_table
     local cny = yava._chunks[yava._chunkKey(chunk.x,chunk.y+1,chunk.z)] or nul_table
@@ -178,7 +181,6 @@ function yava._updateChunks()
         end
     end
 
-    yava._stale_chunk_set[chunk] = nil
     return true
 end
 
@@ -252,10 +254,10 @@ include("yava_lib_chunk.lua")
 hook.Add("Think","yava_update",function()
     local start = SysTime()
     
-    for i=1,100 do
+    for i=1,1000 do
         local t = SysTime()-start
         if not yava._updateChunks() then break end
-        if t>.005 then break end
+        if CLIENT and t>.005 then break end
     end
     
     if SERVER then
@@ -319,7 +321,7 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        --print(chunk_bits,chunk_time)
+        print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
@@ -394,7 +396,7 @@ else
 
                             chunk_time = chunk_time + (SysTime()-t)
                         end
-                        print(chunk_time)
+                        --print(chunk_time)
                     end
 
                     --if send1 then return end

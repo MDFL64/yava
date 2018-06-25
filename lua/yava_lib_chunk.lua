@@ -1042,15 +1042,18 @@ local counts = {}
 
 function yava._chunkNetworkPP3D_recv()
 
-    local block_data = {0,0,0,0,0,0,0,0}
-
     local cx = readVarWidth()
     local cy = readVarWidth()
     local cz = readVarWidth()
 
+    local consumer, chunk = yava._chunkConsumerConstruct(cx,cy,cz)
+
     for i=1,256 do
         P[i] = (i-1)%4
     end
+
+    local run_type
+    local run_len=0
 
     local predicted_count = 0
     local not_P1 = false
@@ -1060,15 +1063,30 @@ function yava._chunkNetworkPP3D_recv()
             for i=1,32 do
                 row[i]=0
             end
-
+            
+            -- mixing the RLE consumer and this predictor compression is NO GOOD
             if y>0 then
-                chunk_get_row(block_data,row_py,y-1,z)
+                if run_len>=32 then
+                    for i=1,32 do row_py[i]=run_type end
+                else
+                    chunk_get_row(chunk.block_data,row_py,y-1,z)
+                    if run_len>0 then
+                        for i=33-run_len,32 do row_py[i]=run_type end
+                    end
+                end
             else
                 for i=1,32 do row_py[i]=0 end
             end
 
             if z>0 then
-                chunk_get_row(block_data,row_pz,y,z-1)
+                if run_len>=1024 then
+                    for i=1,32 do row_pz[i]=run_type end
+                else
+                    chunk_get_row(chunk.block_data,row_pz,y,z-1)
+                    if run_len>992 then
+                        for i=1025-run_len,32 do row_pz[i]=run_type end
+                    end
+                end
             else
                 for i=1,32 do row_pz[i]=0 end
             end
@@ -1121,17 +1139,28 @@ function yava._chunkNetworkPP3D_recv()
                     end
                 end
 
+                if d == run_type then
+                    run_len = run_len+1
+                else
+                    if run_len>0 then
+                        consumer(run_type,run_len)
+                    end
+                    run_type = d
+                    run_len = 1
+                end
+
                 -- write back to cached row
                 
                 if d~=0 then
                     row[x+1] = d
-                    chunk_set_block(block_data,x,y,z,d)
                 end
             end
         end
     end
 
-    return {x=cx,y=cy,z=cz,block_data=block_data}
+    consumer(run_type,run_len)
+
+    return chunk
 end
 
 yava._chunkSetBlock = chunk_set_block
