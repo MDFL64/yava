@@ -1116,7 +1116,6 @@ function yava._chunkNetworkPP3D_recv()
                     else -- 0 (P1)
                         not_P1 = true
                         predicted_count = readVarWidth()+1
-                        counts[predicted_count-1] = (counts[predicted_count-1] or 0)+1
                         d = P[H+1]
                         predicted_count = predicted_count-1
                     end
@@ -1133,30 +1132,6 @@ function yava._chunkNetworkPP3D_recv()
     end
 
     return {x=cx,y=cy,z=cz,block_data=block_data}
-end
-
-if CLIENT then
-    concommand.Add("yava_cc", function()
-        --PrintTable(counts)
-        local pp = {}
-        local sum = 0
-        for i=0,32767 do
-            sum = sum+(counts[i] or 0)
-        end
-        for i=0,32767 do
-            if counts[i] then                
-                local bc = 0
-                local b = i
-                while b~=0 do
-                    b = bit.rshift(b, 1)
-                    bc = bc + 1
-                end
-                pp[bc] = (pp[bc] or 0) + counts[i]
-                print(i,counts[i],string.format("%.1f",-math.log(counts[i]/sum,2)))
-            end
-        end
-        PrintTable(pp)
-    end)
 end
 
 yava._chunkSetBlock = chunk_set_block
