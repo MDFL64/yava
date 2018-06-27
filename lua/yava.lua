@@ -267,6 +267,7 @@ end)
 
 local chunk_bits = 0
 local chunk_time = 0
+
 if CLIENT then
     hook.Add("PostDrawOpaqueRenderables","yava_render",function()
         
@@ -299,6 +300,16 @@ if CLIENT then
     net.Receive("yava_chunk_blocks", function(bits)
         local t = SysTime()
 
+        local buffer = yava._chunkNetworkBuffer
+        local bits_left = bits
+        local i = 1
+        local min = math.min
+        while bits_left > 0 do
+            buffer[i] = net.ReadUInt(min(bits_left,32))
+            i=i+1
+            bits_left=bits_left-32
+        end
+        
         local chunk = yava._chunkNetworkPP3D_recv()
         local x = chunk.x
         local y = chunk.y

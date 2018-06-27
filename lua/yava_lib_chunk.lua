@@ -1,7 +1,9 @@
 AddCSLuaFile()
 
+local bnot = bit.bnot
 local band = bit.band
 local bor = bit.bor
+local bxor = bit.bxor
 local rshift = bit.rshift
 local lshift = bit.lshift
 local floor = math.floor
@@ -783,6 +785,10 @@ local function writeVarWidth(n)
     until n==0
 end
 
+local net_buffer = {}
+local net_buffer_i = 0
+yava._chunkNetworkBuffer = net_buffer
+
 local function readVarWidth()
     local n=0
     local s=0
@@ -794,125 +800,38 @@ local function readVarWidth()
     return n
 end
 
-local memo_def = {3,0,1,2}
-local memo = {}
+local function buffer_readUInt(nb)
+    local n=0
+    local s=0
+    while nb>0 do
+        local bit_index = band(net_buffer_i,31)
+        local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],bit_index)
+        local bits_avail = 32-bit_index
+        local nb_now = min(nb,bits_avail)
+        n = bor(n,lshift(band(shifted_d,bnot(lshift(0xFFFFFFFF,nb_now))),s))
 
-function yava._resetNetMemo()
-    for i=1,#memo_def do
-        memo[i] = memo_def[i]
+        s=s+nb_now
+        nb=nb-nb_now
+        net_buffer_i=net_buffer_i+nb_now
     end
-end
-
-yava._resetNetMemo()
-
---[[local counts = {}
-for i=1,#memo_def do
-    counts[i]=0
-end]]
-
-local function memo_shift(start)
-    for i=start,2,-1 do
-        memo[i] = memo[i-1]
-    end
-end
-
-local function writeMemo(n)
-    if n==memo[2] then
-        net.WriteBit(false) --0
-        
-        memo_shift(2)
-        --counts[2]=counts[2]+1
-    elseif n==memo[3] then
-        net.WriteUInt(1, 2) --10
-        
-        memo_shift(3)
-        --counts[3]=counts[3]+1
-    elseif n==memo[4] then
-        net.WriteUInt(3, 3) --110
-        
-        memo_shift(4)
-        --counts[4]=counts[4]+1
-    else
-        net.WriteUInt(7, 3) --111
-        writeVarWidth(n)
-
-        memo_shift(6)
-        --counts[1]=counts[1]+1
-    end
-    memo[1] = n
-end
-
---[[if SERVER then
-    concommand.Add("yava_cm",function()
-        PrintTable(counts)
-    end)
-end]]
-
-local function readMemo()
-    local n
-    if net.ReadBool() then -- 1*
-        if net.ReadBool() then --11*
-            if net.ReadBool() then --111 (lit)
-                n = readVarWidth()
-                memo_shift(4)
-            else -- 110 (4)
-                n = memo[4]
-                memo_shift(4)
-            end
-        else -- 10 (3)
-            n = memo[3]
-            memo_shift(3)
-        end
-    else -- 0 (2)
-        n = memo[2]
-        memo_shift(2)
-    end
-
-    memo[1] = n
-
     return n
 end
 
-function yava._chunkConsumerNetwork()
-    local function consumer(type,count)
-        --print(type,count)
-        writeMemo(type)
-        --[[if count == 1 then
-            net.WriteBit(false)
-        else]]
-            --net.WriteBit(true)
-        writeVarWidth(count-1)
-        --end
-    end
-    local function finalizer()
-        writeMemo(0xFFFF)
-    end
-    return consumer, finalizer
+local function buffer_readBool()
+    local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],band(net_buffer_i,31))
+    net_buffer_i=net_buffer_i+1
+    return band(shifted_d,1)==1
 end
 
---local counts = {}
-
-function yava._chunkProvideNetwork(consumer)
-    local failsafe = 0
-    while failsafe<33000 do
-        local type = readMemo()
-        ----print(string.format("%x",type))
-        if type==0xFFFF then break end
-        --if net.ReadBool() then
-            --print(type,count)
-
-        local count = readVarWidth()
-        consumer(type,count+1)
-        --counts[count] = (counts[count] or 0) + 1
-
-        --[[else
-            --print(type,1)
-            consumer(type,1)
-            counts[0] = (counts[0] or 0) + 1
-        end]]
-        failsafe=failsafe+1
-    end
-    if failsafe==33000 then error("rer") end
+local function buffer_readVarWidth()
+    local n=0
+    local s=0
+    repeat
+        local bits = buffer_readUInt(3)
+        n = bor(n,lshift(bits,s))
+        s=s+3
+    until not buffer_readBool()
+    return n
 end
 
 local P = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -932,6 +851,10 @@ function yava._chunkNetworkPP3D_send(chunk)
     for i=1,256 do
         P[i] = (i-1)%4
     end
+
+    --net.WriteUInt(chunk.x, 32)
+    --net.WriteUInt(chunk.y, 32)
+    --net.WriteUInt(chunk.z, 32)
 
     writeVarWidth(chunk.x)
     writeVarWidth(chunk.y)
@@ -1038,13 +961,12 @@ function yava._chunkNetworkPP3D_send(chunk)
     end
 end
 
-local counts = {}
-
 function yava._chunkNetworkPP3D_recv()
+    net_buffer_i = 0
 
-    local cx = readVarWidth()
-    local cy = readVarWidth()
-    local cz = readVarWidth()
+    local cx = buffer_readVarWidth()
+    local cy = buffer_readVarWidth()
+    local cz = buffer_readVarWidth()
 
     local consumer, chunk = yava._chunkConsumerConstruct(cx,cy,cz)
 
@@ -1096,18 +1018,18 @@ function yava._chunkNetworkPP3D_recv()
                 local px = x>0 and row[x] or 0
                 local py = row_py[x+1]
                 local pz = row_pz[x+1]
-                local H = bit.band(bit.bxor(px,py*7,pz*13),0x3F)*4
+                local H = band(bxor(px,py*7,pz*13),0x3F)*4
                 
                 local d
                 if predicted_count>0 then
                     d = P[H+1]
                     predicted_count = predicted_count-1
                 else
-                    if not_P1 or net.ReadBool() then -- 1*
+                    if not_P1 or buffer_readBool() then -- 1*
                         not_P1 = false
-                        if net.ReadBool() then --11*
-                            if net.ReadBool() then --111*
-                                if net.ReadBool() then --1111 (P4)
+                        if buffer_readBool() then --11*
+                            if buffer_readBool() then --111*
+                                if buffer_readBool() then --1111 (P4)
                                     d = P[H+4]
                                     P[H+4] = P[H+3]
                                     P[H+3] = P[H+2]
@@ -1120,7 +1042,7 @@ function yava._chunkNetworkPP3D_recv()
                                     P[H+1] = d
                                 end
                             else -- 110 (LIT)
-                                d = readVarWidth()
+                                d = buffer_readVarWidth()
                                 P[H+4] = P[H+3]
                                 P[H+3] = P[H+2]
                                 P[H+2] = P[H+1]
@@ -1133,7 +1055,7 @@ function yava._chunkNetworkPP3D_recv()
                         end
                     else -- 0 (P1)
                         not_P1 = true
-                        predicted_count = readVarWidth()+1
+                        predicted_count = buffer_readVarWidth()+1
                         d = P[H+1]
                         predicted_count = predicted_count-1
                     end
