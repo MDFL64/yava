@@ -818,9 +818,12 @@ local function buffer_readUInt(nb)
 end
 
 local function buffer_readBool()
-    local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],band(net_buffer_i,31))
-    net_buffer_i=net_buffer_i+1
-    return band(shifted_d,1)==1
+    --local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],band(net_buffer_i,31))
+    --net_buffer_i=net_buffer_i+1
+    --return band(shifted_d,1)==1
+    
+    -- for whatever reason the above optimized version is slower than this
+    return buffer_readUInt(1)==1
 end
 
 local function buffer_readVarWidth()
