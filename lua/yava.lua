@@ -299,18 +299,8 @@ if CLIENT then
     local rx_chunk_count = 0
     net.Receive("yava_chunk_blocks", function(bits)
         local t = SysTime()
-
-        local buffer = yava._chunkNetworkBuffer
-        local bits_left = bits
-        local i = 1
-        local min = math.min
-        while bits_left > 0 do
-            buffer[i] = net.ReadUInt(min(bits_left,32))
-            i=i+1
-            bits_left=bits_left-32
-        end
         
-        local chunk = yava._chunkNetworkPP3D_recv()
+        local chunk = yava._chunkNetworkPP3D_recv(bits)
         local x = chunk.x
         local y = chunk.y
         local z = chunk.z

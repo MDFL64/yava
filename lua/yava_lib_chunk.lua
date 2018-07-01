@@ -787,7 +787,6 @@ end
 
 local net_buffer = {}
 local net_buffer_i = 0
-yava._chunkNetworkBuffer = net_buffer
 
 local function readVarWidth()
     local n=0
@@ -970,7 +969,17 @@ function yava._chunkNetworkPP3D_recv()
     local cx = buffer_readVarWidth()
     local cy = buffer_readVarWidth()
     local cz = buffer_readVarWidth()
+function yava._chunkNetworkPP3D_recv(bits)
 
+    do -- fill that buffer
+        local i = 1
+        local min = math.min
+        while bits > 0 do
+            net_buffer[i] = net.ReadUInt(min(bits,32))
+            i=i+1
+            bits=bits-32
+        end
+    end
     local consumer, chunk = yava._chunkConsumerConstruct(cx,cy,cz)
 
     for i=1,256 do
