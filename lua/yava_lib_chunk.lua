@@ -963,12 +963,6 @@ function yava._chunkNetworkPP3D_send(chunk)
     end
 end
 
-function yava._chunkNetworkPP3D_recv()
-    net_buffer_i = 0
-
-    local cx = buffer_readVarWidth()
-    local cy = buffer_readVarWidth()
-    local cz = buffer_readVarWidth()
 function yava._chunkNetworkPP3D_recv(bits)
 
     do -- fill that buffer
@@ -1078,7 +1072,6 @@ function yava._chunkNetworkPP3D_recv(bits)
                         if predicted_count==32767 then
                             -- SHORT PATH! WHOLE CHUNK IS PREDICTED!
                             -- THEREFORE IT IS ALL VOID!
-                            consumer(0,32768)
                             return chunk
                         end
                         d = P[H+1]
