@@ -17,30 +17,25 @@ function ENT:Initialize()
     self:SetRenderMode(RENDERMODE_NONE) 
 end
 
-local count = 0
+
 function ENT:SetupCollisions(soup)
-    --print("creating")
     local old_physobj = self:GetPhysicsObject()
     if IsValid(old_physobj) then
         self:SetCollisionGroup(COLLISION_GROUP_WORLD)
         old_physobj:EnableCollisions(false)
         old_physobj:RecheckCollisionFilter()
-        --old_physobj:OutputDebugInfo()
     end
 
-    self:PhysicsFromMesh(soup) -- CRASH HERE!
+    self:PhysicsFromMesh(soup)
     self:GetPhysicsObject():EnableMotion(false)
 
     self:EnableCustomCollisions(true)
     
     self:PhysicsInit(SOLID_VPHYSICS)
-    self:SetSolid(SOLID_VPHYSICS)
+    self:SetSolid(SOLID_VPHYSICS)    --- <= MIGHT only need this.
     self:SetMoveType(MOVETYPE_VPHYSICS)
 
     self:SetCollisionGroup(COLLISION_GROUP_NONE)
-
-    count = count + 1
-    --print("created",count)
 end
 
 --[[function ENT:TestCollision() 
