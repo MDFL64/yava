@@ -980,6 +980,13 @@ function yava._chunkNetworkPP3D_recv(bits)
             bits=bits-32
         end
     end
+    
+    net_buffer_i = 0
+
+    local cx = buffer_readVarWidth()
+    local cy = buffer_readVarWidth()
+    local cz = buffer_readVarWidth()
+    
     local consumer, chunk = yava._chunkConsumerConstruct(cx,cy,cz)
 
     for i=1,256 do
