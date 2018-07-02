@@ -66,7 +66,7 @@ if CLIENT then
 
     function yava._buildAtlas()
         local pointSample = true
-        local atlas_texture = GetRenderTargetEx("__yava_atlas",16,4096,
+        local atlas_texture = GetRenderTargetEx("__yava_atlas",32,4096,
             RT_SIZE_NO_CHANGE,MATERIAL_RT_DEPTH_NONE,pointSample and 1 or 0,CREATERENDERTARGETFLAGS_AUTOMIPMAP,IMAGE_FORMAT_RGBA8888)
 
         render.PushRenderTarget(atlas_texture)
@@ -81,9 +81,9 @@ if CLIENT then
             local source = Material(imgDir.."/"..name..".png")
 
             surface.SetMaterial(source)
-            surface.DrawTexturedRectUV(0,(i-1)*32,16,8,     0,0,1,0.03125)
-            surface.DrawTexturedRect(0,(i-1)*32+8,16,16)
-            surface.DrawTexturedRectUV(0,(i-1)*32+24,16,8,  0,0.96875,1,1)
+            surface.DrawTexturedRectUV( 0,(i-1)*64,      16,16,     0,0,1,0.015625)
+            surface.DrawTexturedRect(   0,(i-1)*64+16,   32,32)
+            surface.DrawTexturedRectUV( 0,(i-1)*64+48,   32,16,     0,0.984375,1,1)
         end
 
         cam.End2D()
@@ -322,7 +322,7 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        --print(chunk_bits,chunk_time)
+        print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
