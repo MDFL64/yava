@@ -1,10 +1,12 @@
 AddCSLuaFile()
 
 yava.changes = [[
-A4: ???
+A4: July 1, 2018
     [Testbed]
     - Fixed advanced gun attempting to set voxels clientside.
     - Switched default block type to rock.
+    - Moved voxel guns into the last category, with the toolgun.
+    - Changed map generator, map now has more flat space.
     [Internal]
     - Dramatically improved network compression.
     - Lowered fixed atlas size to 4096. All but a fraction of a percent of GPUs should now be supported.

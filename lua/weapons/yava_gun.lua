@@ -11,6 +11,7 @@ SWEP.Secondary.Automatic = true
 
 SWEP.Category = "YAVA"
 SWEP.Spawnable = true
+SWEP.Slot = 5
 
 function SWEP:PrimaryAttack()
 	if IsFirstTimePredicted() and yava then

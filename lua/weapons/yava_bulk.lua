@@ -12,6 +12,7 @@ SWEP.Secondary.Automatic = true
 SWEP.Category = "YAVA"
 SWEP.Spawnable = true
 SWEP.AdminOnly = true
+SWEP.Slot = 5
 
 function SWEP:SetupDataTables()
 	self:NetworkVar("Int",0,"BrushSize")

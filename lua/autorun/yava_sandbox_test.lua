@@ -13,11 +13,11 @@ yava.addBlockType("grass",{
     bottomImage = "dirt"
 })
 
+yava.addBlockType("face")
 yava.addBlockType("checkers")
 yava.addBlockType("purple")
 yava.addBlockType("stripes")
 
-yava.addBlockType("face")
 yava.addBlockType("test",{
     frontImage = "test_front",
     backImage = "test_back",
@@ -38,27 +38,39 @@ yava.init{
     imageDir = "yava_test",
     generator = function(x,y,z)
         
-        if x==70 and y==70 then
-            return "face"
+        local offset_mid_x = x-320
+        local offset_mid_y = y-320
+
+        local dist_mid_sqr = offset_mid_x^2 + offset_mid_y^2
+
+        if dist_mid_sqr<100 and z<=50 then
+            return "rock"
         end
 
-        if ((x-200)^2 + (y-200)^2 + (z-100)^2)^.5 < 30 then
+        if ((x-180)^2 + (y-180)^2 + (z-120)^2)^.5 < 30 then
             return "checkers"
-        elseif ((x-200)^2 + (y-200)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
+        elseif ((x-180)^2 + (y-180)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
             return "purple"
         end
+
+        local lvl
         
-        if x>300+math.sin(y/40)*10 and x<350+math.sin(y/10)*5 then
+        if dist_mid_sqr<10000 then
+            lvl = 50
+        elseif dist_mid_sqr<16000 then
             if z<3 then
                 return "stripes"
+            elseif z<50 and math.random()<.002 then
+                return "test"
             end
-            if math.random()<.001 then return "test" end
             return "void"
+        else
+            local scale = dist_mid_sqr/15000
+            lvl = (math.sin(x/16) + math.sin(y/16)*4)*scale + 50
         end
-
-        local lvl = math.sin(x/16)*5 + math.sin(y/16)*20 + 30
+        
         if z<lvl then
-            if lvl-z < 1 then
+            if lvl-z <= 1 then
                 return "grass"
             end
             if lvl-z > 5 then
@@ -68,11 +80,12 @@ yava.init{
         else
             return "void"
         end
+
     end
 }
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
-    ply:SetPos(Vector(-9000, -8000, 3000))
+    ply:SetPos(Vector(0, 0, 2120))
     ply:Give("yava_gun")
     if ply:IsAdmin() then
         ply:Give("yava_bulk")
