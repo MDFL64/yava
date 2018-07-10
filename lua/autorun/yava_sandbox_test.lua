@@ -44,7 +44,7 @@ yava.addBlockType("sand")
 
 local MAP_FILE
 if SERVER then 
-    MAP_FILE = file.Open("fortblox.dat","rb","DATA")
+    MAP_FILE = file.Open("fortblox2.dat","rb","DATA")
 end
 local CURRENT_INDEX = 0
 
