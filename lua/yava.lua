@@ -106,6 +106,7 @@ end
 
 if SERVER then
     function yava._buildChunks(dims)
+        local t1 = SysTime()
         for z=0,dims.z-1 do
             for y=0,dims.y-1 do
                 for x=0,dims.x-1 do
@@ -122,7 +123,7 @@ if SERVER then
         for _,chunk in pairs(yava._chunks) do
             sum = sum + #chunk.block_data
         end
-        --print(sum*8)
+        print("Worldgen: ",SysTime()-t1)
     end
 end
 
@@ -322,7 +323,7 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        print(chunk_bits,chunk_time)
+        --print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")

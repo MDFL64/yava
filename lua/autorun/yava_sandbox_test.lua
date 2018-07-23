@@ -6,7 +6,6 @@ if SERVER then resource.AddWorkshop("1402515908") end
 
 include("yava.lua")
 
-yava.addBlockType("light") -- LL
 yava.addBlockType("rock")
 yava.addBlockType("dirt")
 
@@ -16,6 +15,7 @@ yava.addBlockType("grass",{
 })
 
 --laylad
+yava.addBlockType("light")
 yava.addBlockType("dark")
 yava.addBlockType("orange")
 yava.addBlockType("red")
@@ -48,33 +48,39 @@ if SERVER then
 end
 local CURRENT_INDEX = 0
 
-yava.init{
-    imageDir = "yava_test",
-    blockScale=25,
-    chunkDimensions=Vector(8,16,5),
-    generator = function(x,y,z)
-        if z>=128 then return "void" end
+local FORTBLOX = false
 
-        local index = x + y*256 + z*256*512
-        if index~=CURRENT_INDEX then
-            MAP_FILE:Seek(index)
-            CURRENT_INDEX = index
+if FORTBLOX then
+    yava.init{
+        imageDir = "yava_test",
+        blockScale=25,
+        chunkDimensions=Vector(8,16,5),
+        generator = function(x,y,z)
+            if z>=128 then return "void" end
+
+            local index = x + y*256 + z*256*512
+            if index~=CURRENT_INDEX then
+                MAP_FILE:Seek(index)
+                CURRENT_INDEX = index
+            end
+
+            local d = MAP_FILE:ReadByte()
+            CURRENT_INDEX=CURRENT_INDEX+1
+
+            if d == 0 then      return "void"
+            elseif d==1 then    return "rock"
+            elseif d==2 then    return "dark"
+            elseif d==5 then    return "red"
+            elseif d==6 then    return "orange"
+            elseif d==10 then   return "green"
+            elseif d==128 then  return "dirt"
+            else                return "light"
+            end
         end
-
-        local d = MAP_FILE:ReadByte()
-        CURRENT_INDEX=CURRENT_INDEX+1
-
-        if d == 0 then      return "void"
-        elseif d==1 then    return "rock"
-        elseif d==2 then    return "dark"
-        elseif d==5 then    return "red"
-        elseif d==6 then    return "orange"
-        elseif d==10 then   return "green"
-        elseif d==128 then  return "dirt"
-        else                return "light"
-        end
-    end
-}
+    }
+else
+    
+end
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:SetPos(Vector(0, 0, 2120))
