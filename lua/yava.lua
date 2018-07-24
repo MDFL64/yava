@@ -1,3 +1,6 @@
+-- test without jit
+-- jit.off()
+
 AddCSLuaFile()
 
 yava = {}
@@ -128,11 +131,14 @@ if SERVER then
 end
 
 local nul_table = {}
---local cl_table = {}
+local mesh_time = 0
+
 function yava._updateChunks()
     local chunk = next(yava._stale_chunk_set)
     if not chunk then return false end
     
+    local t_start = SysTime()
+
     -- do this early so we can recover from chunks that fail to mesh right
     yava._stale_chunk_set[chunk] = nil
 
@@ -181,6 +187,9 @@ function yava._updateChunks()
             end
         end
     end
+
+    mesh_time = mesh_time + (SysTime()-t_start)
+    --print(string.format("%.5s",mesh_time))
 
     return true
 end

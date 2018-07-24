@@ -785,8 +785,13 @@ local function writeVarWidth(n)
     until n==0
 end
 
+local USE_BUFFER = true
+
 local net_buffer = {}
 local net_buffer_i = 0
+
+local buffer_readBool
+local buffer_readVarWidth
 
 local function readVarWidth()
     local n=0
@@ -816,25 +821,34 @@ local function buffer_readUInt(nb)
     return n
 end
 
-local function buffer_readBool()
-    --local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],band(net_buffer_i,31))
-    --net_buffer_i=net_buffer_i+1
-    --return band(shifted_d,1)==1
+local buffer_readBool
+local buffer_readVarWidth
 
-    -- for whatever reason the above optimized version is slower than this
-    return buffer_readUInt(1)==1
+if USE_BUFFER then
+    buffer_readBool = function()
+        --local shifted_d = rshift(net_buffer[rshift(net_buffer_i,5)+1],band(net_buffer_i,31))
+        --net_buffer_i=net_buffer_i+1
+        --return band(shifted_d,1)==1
+    
+        -- for whatever reason the above optimized version is slower than this
+        return buffer_readUInt(1)==1
+    end
+    
+    buffer_readVarWidth = function()
+        local n=0
+        local s=0
+        repeat
+            local bits = buffer_readUInt(3)
+            n = bor(n,lshift(bits,s))
+            s=s+3
+        until not buffer_readBool()
+        return n
+    end
+else
+    buffer_readBool = net.ReadBool
+    buffer_readVarWidth = readVarWidth
 end
 
-local function buffer_readVarWidth()
-    local n=0
-    local s=0
-    repeat
-        local bits = buffer_readUInt(3)
-        n = bor(n,lshift(bits,s))
-        s=s+3
-    until not buffer_readBool()
-    return n
-end
 
 local P = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -965,7 +979,7 @@ end
 
 function yava._chunkNetworkPP3D_recv(bits)
 
-    do -- fill that buffer
+    if USE_BUFFER then -- fill that buffer
         local i = 1
         local min = math.min
         while bits > 0 do

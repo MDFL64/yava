@@ -79,7 +79,55 @@ if FORTBLOX then
         end
     }
 else
-    
+    yava.init{
+        imageDir = "yava_test",
+        generator = function(x,y,z)
+            
+            local offset_mid_x = x-320
+            local offset_mid_y = y-320
+     
+            local dist_mid_sqr = offset_mid_x^2 + offset_mid_y^2
+     
+            if dist_mid_sqr<100 and z<=50 then
+                return "rock"
+            end
+     
+            if ((x-180)^2 + (y-180)^2 + (z-120)^2)^.5 < 30 then
+                return "checkers"
+            elseif ((x-180)^2 + (y-180)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
+                return "purple"
+            end
+     
+            local lvl
+            
+            if dist_mid_sqr<10000 then
+                lvl = 50
+            elseif dist_mid_sqr<16000 then
+                if z<3 then
+                    return "stripes"
+                elseif z<50 and math.random()<.002 then
+                    return "test"
+                end
+                return "void"
+            else
+                local scale = dist_mid_sqr/15000
+                lvl = (math.sin(x/16) + math.sin(y/16)*4)*scale + 50
+            end
+            
+            if z<lvl then
+                if lvl-z <= 1 then
+                    return "grass"
+                end
+                if lvl-z > 5 then
+                    return "rock"
+                end
+                return "dirt"
+            else
+                return "void"
+            end
+     
+        end
+    }
 end
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
