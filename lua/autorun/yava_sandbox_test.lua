@@ -42,15 +42,16 @@ yava.addBlockType("leaves")
 yava.addBlockType("wood")
 yava.addBlockType("sand")
 
-local MAP_FILE
-if SERVER then 
-    MAP_FILE = file.Open("fortblox2.dat","rb","DATA")
-end
-local CURRENT_INDEX = 0
 
 local FORTBLOX = false
 
 if FORTBLOX then
+    local MAP_FILE
+    if SERVER then 
+        MAP_FILE = file.Open("fortblox2.dat","rb","DATA")
+    end
+    local CURRENT_INDEX = 0
+    
     yava.init{
         imageDir = "yava_test",
         blockScale=25,

@@ -864,13 +864,11 @@ local row_py = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local row_pz = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
 function yava._chunkNetworkPP3D_send(chunk)
+
+    -- setup predictor table
     for i=1,256 do
         P[i] = (i-1)%4
     end
-
-    --net.WriteUInt(chunk.x, 32)
-    --net.WriteUInt(chunk.y, 32)
-    --net.WriteUInt(chunk.z, 32)
 
     writeVarWidth(chunk.x)
     writeVarWidth(chunk.y)
@@ -979,6 +977,11 @@ end
 
 function yava._chunkNetworkPP3D_recv(bits)
 
+    -- setup predictor table
+    for i=1,256 do
+        P[i] = (i-1)%4
+    end
+
     if USE_BUFFER then -- fill that buffer
         local i = 1
         local min = math.min
@@ -996,10 +999,6 @@ function yava._chunkNetworkPP3D_recv(bits)
     local cz = buffer_readVarWidth()
     
     local consumer, chunk = yava._chunkConsumerConstruct(cx,cy,cz)
-
-    for i=1,256 do
-        P[i] = (i-1)%4
-    end
 
     local run_type
     local run_len=0

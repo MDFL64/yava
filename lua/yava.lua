@@ -323,20 +323,14 @@ if CLIENT then
         if next_chunk then yava._stale_chunk_set[next_chunk] = true end
         local next_chunk = yava._chunks[yava._chunkKey(x,y,z-1)]
         if next_chunk then yava._stale_chunk_set[next_chunk] = true end
-
-        net.Start("yava_chunk_blocks_ack")
-        net.WriteUInt(x, 16)
-        net.WriteUInt(y, 16)
-        net.WriteUInt(z, 16)
-        net.SendToServer()
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        --print(chunk_bits,chunk_time)
+        print(chunk_bits,chunk_time)
     end)
 else
     util.AddNetworkString("yava_chunk_blocks")
-    util.AddNetworkString("yava_chunk_blocks_ack")
+    --util.AddNetworkString("yava_chunk_blocks_ack")
     util.AddNetworkString("yava_block")
     util.AddNetworkString("yava_sphere")
     util.AddNetworkString("yava_region")
@@ -350,18 +344,15 @@ else
     function yava._addClient(ply)
         if yava._clients[ply] then return end
 
-        local info = {chunks={},send_count=1,last_chunk=nil,chunks_left=0}
-        yava._clients[ply] = info
+        local info = {chunks={},last_send=CurTime()}
         for _,chunk in pairs(yava._chunks) do
-            info.chunks[chunk] = false
-            info.chunks_left = info.chunks_left + 1
+            info.chunks[chunk] = true
         end
+
+        yava._clients[ply] = info
     end
 
-    local DO_SEND = false
-    concommand.Add("yava_send1", function()
-        DO_SEND = true
-    end)
+    local bytes_per_second = 100000 -- 100 KB/S
 
     function yava._sendChunks()
 
@@ -370,50 +361,41 @@ else
         for client, client_info in pairs(yava._clients) do
 
             if not IsValid(client) then table.insert(removed_clients,client) continue end
-            
-            if client_info.chunks_left > 0 then
-                client_info.send_count = client_info.send_count + 1
+
+            local now = CurTime()
+            local delta = now - client_info.last_send
+
+            client_info.last_send = now
+
+            local byte_limit = delta*bytes_per_second
+            local bytes = 0
+
+
+            for i=1,100 do
+
+                local chunk = next(client_info.chunks)
                 
-                local expire_time = CurTime() - (client:Ping()/500)
-                local n = 0
+                if chunk == nil then table.insert(removed_clients,client) break end
+                client_info.chunks[chunk] = nil
+                
+                -- send the chunk
 
-                for i=1,100 do
-                    if client_info.chunks_left <= 0 or client_info.send_count <= 0 then break end
-                    
-                    local chunk,v = next(client_info.chunks,client_info.last_chunk)
-                    client_info.last_chunk = chunk
-                    if chunk == nil then continue end
-                    
-                    if not v or v<expire_time then
-                        -- send the chunk
-                        if true or DO_SEND then
-                            DO_SEND = false
-                            local t = SysTime()
-                            net.Start("yava_chunk_blocks",true)
-                            
-                            -- new meme
-                            yava._chunkNetworkPP3D_send(chunk)
-                            --yava._resetNetMemo()
-                            --local consumer, finalize = yava._chunkConsumerNetwork()
-                            --yava._chunkProvideChunk(chunk,consumer)
-                            --finalize()
-                            
-                            net.Send(client,true)
-                            
-                            client_info.chunks[chunk] = CurTime()
-                            
-                            client_info.send_count = client_info.send_count - 1
-                            n = n+1
+                local t = SysTime()
+                net.Start("yava_chunk_blocks")
+                
+                yava._chunkNetworkPP3D_send(chunk)
 
-                            chunk_time = chunk_time + (SysTime()-t)
-                        end
-                        --print(chunk_time)
-                    end
+                bytes = bytes + net.BytesWritten()
 
-                    --if send1 then return end
+                net.Send(client)
+
+                chunk_time = chunk_time + (SysTime()-t)
+
+                if bytes > byte_limit then
+                    break
                 end
-                --print("SENT",n)
             end
+
         end
         
         -- prune client table
@@ -422,7 +404,7 @@ else
         end
     end
 
-    net.Receive("yava_chunk_blocks_ack", function(len,ply)
+    --[[net.Receive("yava_chunk_blocks_ack", function(len,ply)
         local x = net.ReadUInt(16)
         local y = net.ReadUInt(16)
         local z = net.ReadUInt(16)
@@ -438,7 +420,7 @@ else
                 --print("ACK",client_info.send_count,client_info.chunks_left)
             end
         end
-    end)
+    end)]]
 end
 
 -- setBlock crap
