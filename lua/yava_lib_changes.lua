@@ -1,6 +1,20 @@
 AddCSLuaFile()
 
 yava.changes = [[
+A5: ???
+    [Testbed]
+    - Increased resolution of some of the testbed textures.
+    - Fixed a bug that caused the advanced voxel gun to fire to rapidly.
+    [Enhancements]
+    - Entity lighting should now match the voxel world's lighting.
+    - The yava_void map now uses a painted sky and sun.
+    - The yava_void map's height now matches its other dimensions.
+    [Internal]
+    - The world can now be reset/regenerated.
+    - Default voxel world now fills the entire yava_void map.
+    - Face texture resolution increased to 32x32 pixels.
+    - Simplified chunk networking.
+    - Made some attempts at Lua autorefresh support.
 A4: July 1, 2018
     [Testbed]
     - Fixed advanced gun attempting to set voxels clientside.

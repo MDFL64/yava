@@ -132,7 +132,7 @@ else
 end
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
-    ply:SetPos(Vector(0, 0, 2120))
+    ply:SetPos(Vector(0, 0, -10690))
     ply:Give("yava_gun")
     if ply:IsAdmin() then
         ply:Give("yava_bulk")

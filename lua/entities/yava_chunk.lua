@@ -11,12 +11,9 @@ function ENT:UpdateTransmitState()
 end
 
 function ENT:Initialize()
-    local chunk_pos = self:GetChunkPos()
-    self.correct_mins = yava._offset + chunk_pos*yava._scale*32
-    self.correct_maxs = self.correct_mins + Vector(32,32,32)*yava._scale
-    self:SetRenderMode(RENDERMODE_NONE) 
+    
+    self:SetRenderMode(RENDERMODE_NONE)
 end
-
 
 function ENT:SetupCollisions(soup)
     local old_physobj = self:GetPhysicsObject()
@@ -45,7 +42,13 @@ end
 end]]
 
 function ENT:Think()
-    self:SetCollisionBounds(self.correct_mins, self.correct_maxs)
+    if yava._offset then
+        local chunk_pos = self:GetChunkPos()
+        local correct_mins = yava._offset + chunk_pos*yava._scale*32
+        local correct_maxs = correct_mins + Vector(32,32,32)*yava._scale
+
+        self:SetCollisionBounds(correct_mins, correct_maxs)
+    end
 
     if CLIENT then
         if not self.setup then

@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 
-yava = {}
+yava = yava or {}
 
 do -- CONSTANTS
     yava.FACE_NONE = 0
@@ -12,50 +12,59 @@ do -- CONSTANTS
     yava.FACE_OPAQUE = 3
 end
 
-
--- Kill old chunk colliders
-if SERVER then
-    --print("deleting")
-    for _, ent in pairs( ents.FindByClass( "yava_chunk" ) ) do
-        ent:Remove()
-    end
-    --print("deleted")
-else
+if CLIENT then
     if render.MaxTextureHeight()<4096 then
         ErrorNoHalt("YAVA: Your GPU does not support large enough textures for the atlas: "..render.MaxTextureHeight().."\n")
     end
 end
 
+yava.last_config = yava.last_config or {}
+
 function yava.init(config)
-    config = config or {}
-    
-    local function setDefault(key,value)
-        if config[key] then return end
-        config[key] = value
+
+    if not config and yava.last_config then
+        config = yava.last_config
+    else
+        config = config or {}
+        yava.last_config = config
+        
+        local function setDefault(key,value)
+            if config[key] then return end
+            config[key] = value
+        end
+
+        setDefault("basePos", Vector(-12800,-12800,-12800))
+        setDefault("chunkDimensions", Vector(20,20,20))
+        setDefault("blockScale", 40)
+        setDefault("generator", function() return "void" end)
+        setDefault("imageDir", ".")
     end
 
-    setDefault("basePos", Vector(-12800,-12800,0))
-    setDefault("chunkDimensions", Vector(20,20,5))
-    setDefault("blockScale", 40)
-    setDefault("generator", function() return "void" end)
-    setDefault("imageDir", ".")
-
-    yava._vmatrix = Matrix()
-
-    yava._offset = config.basePos
-    yava._scale = config.blockScale
-    yava._vmatrix:Translate( yava._offset )
-    yava._vmatrix:Scale( Vector( 1, 1, 1 ) * yava._scale )
+    if SERVER then    
+        yava._offset = config.basePos
+        yava._scale = config.blockScale
+    end
 
     yava._generator = config.generator
 
     yava._imageDir = config.imageDir
+
+    -- reset chunks
+    yava._chunks = {}
+    yava._stale_chunk_set = {}
 
     if CLIENT then
         timer.Simple(0,function()
             yava._buildAtlas()
         end)
     else
+        -- Kill old chunk colliders
+        for _, ent in pairs( ents.FindByClass( "yava_chunk" ) ) do
+            ent:Remove()
+        end
+
+        yava._clients = {}
+        
         yava._buildChunks( config.chunkDimensions )
         for _,ply in pairs(player.GetHumans()) do
             yava._addClient(ply)
@@ -64,6 +73,7 @@ function yava.init(config)
 
     yava._isSetup = true
 end
+
 
 if CLIENT then
 
@@ -99,9 +109,6 @@ if CLIENT then
         yava._atlas_screen:SetTexture("$basetexture",atlas_texture)
     end
 end
-
-yava._chunks = {}
-yava._stale_chunk_set = {}
 
 function yava._chunkKey(x,y,z)
     return x+y*1024+z*1048576
@@ -195,7 +202,7 @@ function yava._updateChunks()
 end
 
 -- maps (name -> id) and (id+1 -> name)
-yava._blockTypes = {}
+yava._blockTypes = yava._blockTypes or {}
 -- each subtable maps (id+1 -> data)
 if CLIENT then
     yava._blockFaceImages = {{},{},{},{},{},{}}
@@ -257,7 +264,9 @@ function yava.addBlockType(name,settings)
     yava._blockSolidity[block_id+1] = solid
 end
 
-yava.addBlockType("void",{faceType = yava.FACE_NONE, solid = false})
+if #yava._blockTypes == 0 then
+    yava.addBlockType("void",{faceType = yava.FACE_NONE, solid = false})
+end
 
 include("yava_lib_chunk.lua")
 
@@ -279,10 +288,21 @@ local chunk_bits = 0
 local chunk_time = 0
 
 if CLIENT then
-    hook.Add("PostDrawOpaqueRenderables","yava_render",function()
-        
-        if not yava._isSetup then return end
-        
+    net.Receive("yava_init", function()
+        yava._offset = net.ReadVector()
+        yava._scale = net.ReadFloat()
+
+        yava._vmatrix = Matrix()
+        yava._vmatrix:Translate( yava._offset )
+        yava._vmatrix:Scale( Vector( 1, 1, 1 ) * yava._scale )
+
+        -- reset chunks
+        yava._chunks = {}
+        yava._stale_chunk_set = {}
+    end)
+
+    hook.Add("PreRender","yava_light",function()
+        -- TODO proper light direction
         render.SuppressEngineLighting(true) 
         render.SetModelLighting(BOX_TOP,    1,1,1 )
         render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )
@@ -290,6 +310,19 @@ if CLIENT then
         render.SetModelLighting(BOX_LEFT,   .5,.5,.5 )
         render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
         render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )
+    end)
+
+    hook.Add("PostDrawOpaqueRenderables","yava_render",function()
+        
+        if not yava._vmatrix then return end
+        
+        --[[render.SuppressEngineLighting(true) 
+        render.SetModelLighting(BOX_TOP,    1,1,1 )
+        render.SetModelLighting(BOX_FRONT,  .8,.8,.8 )
+        render.SetModelLighting(BOX_RIGHT,  .6,.6,.6 )
+        render.SetModelLighting(BOX_LEFT,   .5,.5,.5 )
+        render.SetModelLighting(BOX_BACK,   .3,.3,.3 )
+        render.SetModelLighting(BOX_BOTTOM, .1,.1,.1 )]]
         
         if yava._atlas then
             render.SetMaterial( yava._atlas )
@@ -303,7 +336,7 @@ if CLIENT then
         end
         cam.PopModelMatrix()
 
-        render.SuppressEngineLighting(false) 
+        --render.SuppressEngineLighting(false) 
     end)
 
     local rx_chunk_count = 0
@@ -326,16 +359,21 @@ if CLIENT then
         
         chunk_bits = chunk_bits + bits
         chunk_time = chunk_time + (SysTime()-t)
-        print(chunk_bits,chunk_time)
+        --print(chunk_bits,chunk_time)
     end)
 else
+    util.AddNetworkString("yava_init")
     util.AddNetworkString("yava_chunk_blocks")
     --util.AddNetworkString("yava_chunk_blocks_ack")
     util.AddNetworkString("yava_block")
     util.AddNetworkString("yava_sphere")
     util.AddNetworkString("yava_region")
 
-    yava._clients = {}
+    hook.Add("PostCleanupMap","yava_cleanup_reset",function()
+        if SERVER then
+            yava.init()
+        end
+    end)
 
     hook.Add("PlayerInitialSpawn","yava_player_join",function(ply)
         yava._addClient(ply)
@@ -344,12 +382,18 @@ else
     function yava._addClient(ply)
         if yava._clients[ply] then return end
 
+        
         local info = {chunks={},last_send=CurTime()}
         for _,chunk in pairs(yava._chunks) do
             info.chunks[chunk] = true
         end
-
+        
         yava._clients[ply] = info
+
+        net.Start("yava_init")
+        net.WriteVector(yava._offset)
+        net.WriteFloat(yava._scale)
+        net.Send(ply)
     end
 
     local bytes_per_second = 100000 -- 100 KB/S

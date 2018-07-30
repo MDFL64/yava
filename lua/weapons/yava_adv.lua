@@ -53,7 +53,7 @@ function SWEP:SecondaryAttack()
 		end
 	end
 
-	self:SetNextPrimaryFire(CurTime()+1)
+	self:SetNextSecondaryFire(CurTime()+1)
 end
 
 function SWEP:Reload()
