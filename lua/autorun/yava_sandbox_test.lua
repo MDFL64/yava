@@ -54,6 +54,7 @@ if FORTBLOX then
     
     yava.init{
         imageDir = "yava_test",
+        saveDir = "testbed",
         blockScale=25,
         chunkDimensions=Vector(8,16,5),
         generator = function(x,y,z)
@@ -82,6 +83,8 @@ if FORTBLOX then
 else
     yava.init{
         imageDir = "yava_test",
+        saveDir = "testbed",
+        loadFile = "autosave_2018-07-31_00-15-20",
         generator = function(x,y,z)
             
             local offset_mid_x = x-320
@@ -129,6 +132,16 @@ else
      
         end
     }
+end
+
+if SERVER then
+    timer.Create("yava_autosave",60*10,0, function()
+        yava.save()
+    end)
+
+    hook.Add("ShutDown","yava_autosave",function()
+        yava.save()
+    end)
 end
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)

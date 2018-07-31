@@ -3,6 +3,15 @@
 
 AddCSLuaFile()
 
+if SERVER and not yava then
+    local old_CleanUpMap = game.CleanUpMap
+    function game.CleanUpMap( dontSendToClients, extraFilters )
+        extraFilters = extraFilters or {}
+        table.insert(extraFilters, "yava_chunk")
+        old_CleanUpMap( dontSendToClients, extraFilters)
+    end
+end
+
 yava = yava or {}
 
 do -- CONSTANTS
@@ -18,18 +27,18 @@ if CLIENT then
     end
 end
 
-yava.last_config = yava.last_config or {}
+yava.currentConfig = yava.currentConfig or {}
 
 function yava.init(config)
 
-    if not config and yava.last_config then
-        config = yava.last_config
+    if not config and yava.currentConfig then
+        config = yava.currentConfig
     else
         config = config or {}
-        yava.last_config = config
+        yava.currentConfig = config
         
         local function setDefault(key,value)
-            if config[key] then return end
+            if config[key] ~= nil then return end
             config[key] = value
         end
 
@@ -49,6 +58,8 @@ function yava.init(config)
 
     yava._imageDir = config.imageDir
 
+    yava._saveDir = config.saveDir
+
     -- reset chunks
     yava._chunks = {}
     yava._stale_chunk_set = {}
@@ -63,9 +74,13 @@ function yava.init(config)
             ent:Remove()
         end
 
-        yava._clients = {}
+        if config.loadFile then
+            yava._load(config.loadFile)
+        else
+            yava._buildChunks( config.chunkDimensions )
+        end
         
-        yava._buildChunks( config.chunkDimensions )
+        yava._clients = {}
         for _,ply in pairs(player.GetHumans()) do
             yava._addClient(ply)
         end
@@ -134,6 +149,108 @@ if SERVER then
             sum = sum + #chunk.block_data
         end
         print("Worldgen: ",SysTime()-t1)
+    end
+
+    function yava.save(filename)
+        local save_dir = "yava/"
+
+        if yava._saveDir then
+            save_dir = save_dir..yava._saveDir.."/"
+        end
+
+        file.CreateDir(save_dir)
+
+        if not filename then
+            filename = os.date("autosave_%Y-%m-%d_%H-%M-%S")
+        end
+
+        filename = save_dir..filename..".yava.dat"
+        
+        local file = file.Open(filename, "wb", "DATA")
+        file:Write("YAVA1\n")
+        
+        -- Write block types
+        file:WriteUShort(#yava._blockTypes)
+        for i=1,#yava._blockTypes do
+            file:Write(yava._blockTypes[i].."\n")
+        end
+
+        -- Write Scale
+        file:WriteFloat(yava._scale)
+        
+        -- Write chunk count
+        local chunk_count = 0
+        for k,v in pairs(yava._chunks) do
+            chunk_count = chunk_count+1
+        end
+        file:WriteUShort(chunk_count)
+
+        -- Write individual chunks
+        for _,chunk in pairs(yava._chunks) do
+            file:WriteUShort(chunk.x)
+            file:WriteUShort(chunk.y)
+            file:WriteUShort(chunk.z)
+
+            yava._chunkProvideChunk(chunk,function(type,count)
+                file:WriteUShort(type)
+                file:WriteUShort(count)
+            end)
+        end
+        
+        file:Close()
+
+        print("Saved:",filename)
+    end
+
+    function yava._load(filename)
+        local load_dir = "yava/"
+
+        if yava._saveDir then
+            load_dir = load_dir..yava._saveDir.."/"
+        end
+
+        filename = load_dir..filename..".yava.dat"
+
+        local file = file.Open(filename, "rb", "DATA")
+
+        assert(file:ReadLine() == "YAVA1\n")
+
+        local save_block_lut = {}
+        for save_id=0,file:ReadUShort()-1 do
+            local save_name = file:ReadLine()
+            save_name = save_name:sub(1,#save_name-1)
+
+            save_block_lut[save_id] = yava._blockTypes[save_name] or 1
+        end
+
+        yava._scale = file:ReadFloat()
+
+        local chunk_count = file:ReadUShort()
+
+        for chunk_i=1,chunk_count do
+            local x = file:ReadUShort()
+            local y = file:ReadUShort()
+            local z = file:ReadUShort()
+
+
+            local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
+
+            local total_count = 0
+            while total_count < 32768 do
+                local type = file:ReadUShort()
+                local count = file:ReadUShort()
+
+                consumer(save_block_lut[type],count)
+                total_count = total_count + count
+            end
+
+            yava._chunks[yava._chunkKey(x,y,z)] = chunk
+            yava._stale_chunk_set[chunk] = true
+        end
+
+        file:Close()
+
+        print("Loaded:",filename)
     end
 end
 
@@ -369,11 +486,7 @@ else
     util.AddNetworkString("yava_sphere")
     util.AddNetworkString("yava_region")
 
-    hook.Add("PostCleanupMap","yava_cleanup_reset",function()
-        if SERVER then
-            yava.init()
-        end
-    end)
+
 
     hook.Add("PlayerInitialSpawn","yava_player_join",function(ply)
         yava._addClient(ply)

@@ -4,17 +4,30 @@ yava.changes = [[
 A5: ???
     [Testbed]
     - Increased resolution of some of the testbed textures.
-    - Fixed a bug that caused the advanced voxel gun to fire to rapidly.
+    - Fixed a bug that caused the advanced voxel gun to fire too rapidly.
+    - The map is now auto-saved every 10 minutes, and upon server closing.
     [Enhancements]
+    - Map cleanup now ignores voxel chunks.
     - Entity lighting should now match the voxel world's lighting.
-    - The yava_void map now uses a painted sky and sun.
-    - The yava_void map's height now matches its other dimensions.
-    [Internal]
-    - The world can now be reset/regenerated.
     - Default voxel world now fills the entire yava_void map.
+    - The yava_void map now uses a painted sky and sun.
     - Face texture resolution increased to 32x32 pixels.
+    - The yava_void map's height now matches its other dimensions.
+    - The world can now be reset/regenerated.
     - Simplified chunk networking.
     - Made some attempts at Lua autorefresh support.
+    [API]
+    - Added yava.save(filename), which can be used to save the current map.
+        The map will be saved as `data/yava/[config.saveDir]/[filename].yava.dat`.
+        This save format is fairly basic and takes up a lot of space, but is guaranteed
+        to work with future yava versions and even across different yava configurations to *some extent*.
+        If no `config.saveDir` is provided, the map will be saved in `data/yava`, but this is not recommended.
+    - The yava.init() function can now be used to load a map when provided with the `loadFile` config option.
+        This should be set to the filename of the map to load, sans directories or extensions.
+        This will override the generator when it is set.
+    - Calling yava.init() after it has been called once on the *server* will reset/regenerate the world.
+    - Calling yava.init() with no arguments will reuse the most recent config.
+
 A4: July 1, 2018
     [Testbed]
     - Fixed advanced gun attempting to set voxels clientside.
