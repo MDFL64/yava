@@ -27,6 +27,7 @@ A5: ???
         This will override the generator when it is set.
     - Calling yava.init() after it has been called once on the *server* will reset/regenerate the world.
     - Calling yava.init() with no arguments will reuse the most recent config.
+    - The most recent config can be accessed by yava.currentConfig.
 
 A4: July 1, 2018
     [Testbed]

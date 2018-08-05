@@ -161,7 +161,7 @@ if SERVER then
         file.CreateDir(save_dir)
 
         if not filename then
-            filename = os.date("autosave_%Y-%m-%d_%H-%M-%S")
+            filename = os.date("~autosave_%Y-%m-%d_%H-%M-%S")
         end
 
         filename = save_dir..filename..".yava.dat"
@@ -231,7 +231,6 @@ if SERVER then
             local x = file:ReadUShort()
             local y = file:ReadUShort()
             local z = file:ReadUShort()
-
 
             local consumer, chunk = yava._chunkConsumerConstruct(x,y,z)
 

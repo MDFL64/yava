@@ -24,7 +24,7 @@ yava.addBlockType("green")
 yava.addBlockType("face")
 yava.addBlockType("checkers")
 yava.addBlockType("purple")
-yava.addBlockType("stripes")
+yava.addBlockType("water")
 
 yava.addBlockType("test",{
     frontImage = "test_front",
@@ -42,97 +42,56 @@ yava.addBlockType("leaves")
 yava.addBlockType("wood")
 yava.addBlockType("sand")
 
-
-local FORTBLOX = false
-
-if FORTBLOX then
-    local MAP_FILE
-    if SERVER then 
-        MAP_FILE = file.Open("fortblox2.dat","rb","DATA")
-    end
-    local CURRENT_INDEX = 0
+yava.init{
+    imageDir = "yava_test",
+    saveDir = "testbed",
+    generator = function(x,y,z)
+        
+        local offset_mid_x = x-320
+        local offset_mid_y = y-320
     
-    yava.init{
-        imageDir = "yava_test",
-        saveDir = "testbed",
-        blockScale=25,
-        chunkDimensions=Vector(8,16,5),
-        generator = function(x,y,z)
-            if z>=128 then return "void" end
-
-            local index = x + y*256 + z*256*512
-            if index~=CURRENT_INDEX then
-                MAP_FILE:Seek(index)
-                CURRENT_INDEX = index
-            end
-
-            local d = MAP_FILE:ReadByte()
-            CURRENT_INDEX=CURRENT_INDEX+1
-
-            if d == 0 then      return "void"
-            elseif d==1 then    return "rock"
-            elseif d==2 then    return "dark"
-            elseif d==5 then    return "red"
-            elseif d==6 then    return "orange"
-            elseif d==10 then   return "green"
-            elseif d==128 then  return "dirt"
-            else                return "light"
-            end
+        local dist_mid_sqr = offset_mid_x^2 + offset_mid_y^2
+    
+        if dist_mid_sqr<100 and z<=50 then
+            return "rock"
         end
-    }
-else
-    yava.init{
-        imageDir = "yava_test",
-        saveDir = "testbed",
-        loadFile = "autosave_2018-07-31_00-15-20",
-        generator = function(x,y,z)
-            
-            local offset_mid_x = x-320
-            local offset_mid_y = y-320
-     
-            local dist_mid_sqr = offset_mid_x^2 + offset_mid_y^2
-     
-            if dist_mid_sqr<100 and z<=50 then
+    
+        if ((x-180)^2 + (y-180)^2 + (z-120)^2)^.5 < 30 then
+            return "checkers"
+        elseif ((x-180)^2 + (y-180)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
+            return "purple"
+        end
+    
+        local lvl
+        
+        if dist_mid_sqr<10000 then
+            lvl = 50
+        elseif dist_mid_sqr<16000 then
+            if z<3 then
+                return "water"
+            elseif z<50 and math.random()<.002 then
+                return "test"
+            end
+            return "void"
+        else
+            local scale = dist_mid_sqr/15000
+            lvl = (math.sin(x/16) + math.sin(y/16)*4)*scale + 50
+        end
+        
+        if z<lvl then
+            if lvl-z <= 1 then
+                return "grass"
+            end
+            if lvl-z > 5 then
                 return "rock"
             end
-     
-            if ((x-180)^2 + (y-180)^2 + (z-120)^2)^.5 < 30 then
-                return "checkers"
-            elseif ((x-180)^2 + (y-180)^2)^.5 < (100-z)/10 and (100-z)/10>0 then
-                return "purple"
-            end
-     
-            local lvl
-            
-            if dist_mid_sqr<10000 then
-                lvl = 50
-            elseif dist_mid_sqr<16000 then
-                if z<3 then
-                    return "stripes"
-                elseif z<50 and math.random()<.002 then
-                    return "test"
-                end
-                return "void"
-            else
-                local scale = dist_mid_sqr/15000
-                lvl = (math.sin(x/16) + math.sin(y/16)*4)*scale + 50
-            end
-            
-            if z<lvl then
-                if lvl-z <= 1 then
-                    return "grass"
-                end
-                if lvl-z > 5 then
-                    return "rock"
-                end
-                return "dirt"
-            else
-                return "void"
-            end
-     
+            return "dirt"
+        else
+            return "void"
         end
-    }
-end
+    
+    end
+}
 
 if SERVER then
     timer.Create("yava_autosave",60*10,0, function()
@@ -142,11 +101,25 @@ if SERVER then
     hook.Add("ShutDown","yava_autosave",function()
         yava.save()
     end)
+
+    concommand.Add("yava_reload", function(ply,cmd,args)
+        if ply:IsAdmin() then
+            if args[1] then
+                if args[1] == "@" then
+                    yava.currentConfig.loadFile = nil
+                else
+                    yava.currentConfig.loadFile = args[1]
+                end
+            end
+            yava.init()
+        end
+    end)
 end
 
 hook.Add("PlayerSpawn","yava_spawn_move",function(ply)
     ply:SetPos(Vector(0, 0, -10690))
     ply:Give("yava_gun")
+    ply:SetStepSize(20)
     if ply:IsAdmin() then
         ply:Give("yava_bulk")
         ply:Give("yava_adv")        
