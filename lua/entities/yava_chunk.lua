@@ -30,7 +30,7 @@ function ENT:SetupCollisions(soup)
     
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetSolid(SOLID_VPHYSICS)    --- <= MIGHT only need this.
-    self:SetMoveType(MOVETYPE_VPHYSICS)
+    self:SetMoveType(MOVETYPE_NONE)
 
     self:SetCollisionGroup(COLLISION_GROUP_NONE)
 end
